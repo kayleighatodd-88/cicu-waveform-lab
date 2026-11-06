@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<title>CICU Waveform Lab</title>
+<style>
+:root{
+  --bg:#F5F3EE; --panel:#FFFFFF; --panel2:#FAF9F6; --ink:#333F48; --muted:#5C6770; --line:#D6D2C4;
+  --orange:#BF5700; --on-accent:#FFFFFF; --good:#2E7D57; --goodbg:#EAF5EE; --red:#B3261E; --redbg:#FCEDEB; --chip:#ECE9E1; --focus:#BF5700;
+  --hdr:#333F48; --hdr-ink:#FFFFFF; --hdr-muted:#D6D2C4;
+  --w-ao:#B3261E; --w-lv:#333F48; --w-la:#7B4FA0; --w-vol:#2E7D57; --w-ecg:#1E7A3C; --w-art:#D0342C; --w-cvp:#2B6CB0; --w-pl:#0C8494; --w-snd:#5C6770;
+  --w-band1:rgba(191,87,0,.075); --w-band2:rgba(51,63,72,.03); --w-cursor:#BF5700; --w-axis:#D6D2C4;
+  --sans:"Libre Franklin", Arial, "Helvetica Neue", Helvetica, system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#161B20; --panel:#20272E; --panel2:#272F37; --ink:#ECEAE4; --muted:#A7AEB4; --line:#38424B;
+    --orange:#F8971F; --on-accent:#161B20; --good:#5CC48F; --goodbg:#17301F; --red:#F07A70; --redbg:#3A1D1A; --chip:#2E3740; --focus:#F8971F;
+    --hdr:#0F1418; --hdr-ink:#FFFFFF; --hdr-muted:#D6D2C4;
+    --w-ao:#FF7A70; --w-lv:#ECEAE4; --w-la:#C9A3F0; --w-vol:#7CCB98; --w-ecg:#5BE07F; --w-art:#FF6B61; --w-cvp:#6FB1FF; --w-pl:#4FD6E6; --w-snd:#A7AEB4;
+    --w-band1:rgba(248,151,31,.11); --w-band2:rgba(255,255,255,.03); --w-cursor:#F8971F; --w-axis:#38424B;
+    color-scheme: dark;
+  }
+}
+*,*::before,*::after{ box-sizing:border-box; }
+[hidden]{ display:none !important; }
+body{ margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); font-size:15px; line-height:1.5; }
+button,select,input{ font:inherit; color:inherit; }
+:focus-visible{ outline:3px solid var(--focus); outline-offset:2px; }
+@media (prefers-reduced-motion: reduce){ .nb.al, .alarm .flash{ animation:none !important; } }
+
+/* header */
+.top{ background:var(--hdr); border-bottom:4px solid #BF5700; padding:12px 20px; display:flex; flex-wrap:wrap; gap:10px 24px; align-items:center; justify-content:space-between; }
+.top h1{ margin:0; font-size:22px; color:var(--hdr-ink); font-weight:800; letter-spacing:-.01em; }
+.top h1 a{ color:inherit; text-decoration:none; }
+.top .sub{ margin:2px 0 0; font-size:13.5px; color:var(--hdr-muted); }
+.toolnav{ display:flex; gap:6px; flex-wrap:wrap; }
+.toolnav a{ padding:7px 14px; border-radius:8px; text-decoration:none; font-weight:700; font-size:14px; color:var(--hdr-ink); border:1px solid rgba(214,210,196,.45); }
+.toolnav a:hover{ border-color:#F8971F; }
+.toolnav a[aria-current]{ background:#BF5700; border-color:#BF5700; }
+
+.wrap{ max-width:1400px; margin:0 auto; padding:16px; }
+.card{ background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px 18px; }
+.muted{ color:var(--muted); }
+h2{ font-size:19px; margin:0 0 6px; letter-spacing:-.01em; }
+h3{ font-size:16px; margin:0 0 4px; }
+.kicker{ font-size:12px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--orange); }
+.btn{ background:var(--orange); color:var(--on-accent); border:1px solid var(--orange); border-radius:8px; padding:8px 16px; font-weight:700; cursor:pointer; }
+.btn:hover{ filter:brightness(1.07); }
+.btn.sec{ background:transparent; color:var(--ink); border-color:var(--line); }
+.btn.sec:hover{ border-color:var(--orange); }
+.btn:disabled{ opacity:.45; cursor:default; filter:none; }
+.row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.sp{ flex:1; }
+.stack{ display:grid; gap:16px; }
+
+/* layouts */
+.two{ display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:16px; align-items:start; }
+.two.wide-side{ grid-template-columns:minmax(0,1fr) 400px; }
+@media (max-width:1060px){ .two, .two.wide-side{ grid-template-columns:minmax(0,1fr); } }
+.sticky{ position:sticky; top:12px; }
+@media (max-width:1060px){ .sticky{ position:static; } }
+
+/* scenario bar */
+.scn-bar{ display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; border-left:5px solid var(--orange); }
+.scn-bar label{ font-weight:700; font-size:14px; }
+.scn-bar select{ padding:7px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel2); min-width:min(100%,340px); max-width:100%; }
+.scn-meta{ color:var(--muted); font-size:14px; }
+.scn-meta b{ color:var(--ink); }
+
+/* ---------- monitor ---------- */
+.mon{ background:#000; border:10px solid #2B3036; border-radius:16px; box-shadow:0 10px 28px rgba(0,0,0,.25); overflow:hidden; color:#fff; font-family:Arial, "Helvetica Neue", var(--sans); }
+.mon-top{ display:flex; align-items:center; gap:10px; height:30px; padding:0 10px; background:#203247; font-size:12.5px; color:#DDE6EE; white-space:nowrap; overflow:hidden; }
+.mon-top .bed{ font-weight:700; color:#fff; }
+.mon-top .pt{ color:#AFC2D3; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.mon-top .alarm{ flex:1; display:flex; justify-content:center; min-width:0; }
+.alarm span{ padding:2px 12px; border-radius:2px; font-weight:700; letter-spacing:.02em; overflow:hidden; text-overflow:ellipsis; }
+.alarm .red{ background:#E0201B; color:#fff; } .alarm .yel{ background:#FFE14D; color:#000; } .alarm .cyan{ background:#45D3EE; color:#000; }
+.alarm .flash{ animation:aflash 1s steps(1) infinite; }
+@keyframes aflash{ 50%{ opacity:.35; } }
+.mon-top .sil{ color:#FFE14D; font-weight:700; font-size:11px; }
+.mon-body{ display:grid; grid-template-columns:minmax(0,1fr) 224px; }
+.mon-waves{ position:relative; min-width:0; }
+.mon-waves canvas{ display:block; width:100%; }
+.mon-nums{ display:flex; flex-direction:column; border-left:1px solid #2E2E2E; }
+.nb{ color:var(--c); border-bottom:1px solid #2A2A2A; padding:5px 8px 4px; display:grid; grid-template-columns:auto 1fr; gap:0 6px; position:relative; overflow:hidden; }
+.nb:last-child{ border-bottom:0; }
+.nb[data-row=ecg]{ height:104px; } .nb[data-row=abp]{ height:118px; } .nb[data-row=cvp]{ height:84px; } .nb[data-row=pleth]{ height:96px; } .nb[data-row=co2]{ height:98px; }
+.nb .lab{ font-size:13px; font-weight:700; line-height:1.15; }
+.nb .lim{ display:block; font-size:10.5px; font-weight:400; opacity:.85; margin-top:2px; line-height:1.2; }
+.nb .val{ text-align:right; align-self:center; font-variant-numeric:tabular-nums; line-height:1; white-space:nowrap; }
+.nb .big{ font-size:50px; }
+.nb .mid{ font-size:34px; }
+.nb .sm{ display:block; font-size:12px; margin-top:4px; opacity:.95; }
+.nb .unit{ font-size:11px; opacity:.8; margin-left:2px; }
+.nb.al{ animation:nbflash 1s steps(1) infinite; }
+.nb.al.red{ --fl:#E0201B; } .nb.al.yel{ --fl:#B59A00; }
+@keyframes nbflash{ 0%{ background:var(--fl); color:#fff; } 50%{ background:transparent; } }
+.mon-keys{ display:flex; gap:6px; padding:6px 8px; background:#14181C; flex-wrap:wrap; border-top:1px solid #2E2E2E; }
+.mk{ background:linear-gradient(#EEF1F4,#C6CED6); color:#16212C; border:0; border-radius:6px; padding:6px 12px; font:700 12.5px Arial, var(--sans); cursor:pointer; }
+.mk:hover{ background:linear-gradient(#FFFFFF,#D3DAE1); }
+.mk[aria-pressed=true]{ background:linear-gradient(#FFDDB0,#F5A94F); }
+.mon-foot{ font-size:12px; color:var(--muted); margin:6px 2px 0; }
+@media (max-width:640px){
+  .mon{ border-width:6px; border-radius:12px; }
+  .mon-body{ grid-template-columns:minmax(0,1fr) 112px; }
+  .nb{ padding:3px 5px; grid-template-columns:1fr; }
+  .nb[data-row=ecg]{ height:78px; } .nb[data-row=abp]{ height:90px; } .nb[data-row=cvp]{ height:64px; } .nb[data-row=pleth]{ height:76px; } .nb[data-row=co2]{ height:76px; }
+  .nb .lim{ display:none; } .nb .big{ font-size:30px; } .nb .mid{ font-size:20px; } .nb .sm{ font-size:10px; margin-top:2px; } .nb .lab{ font-size:11px; }
+  .mon-top .pt{ display:none; }
+}
+
+/* ---------- controls ---------- */
+.ctl-panel h2{ margin-bottom:2px; }
+.ctl-panel details{ border-top:1px solid var(--line); padding:8px 0; }
+.ctl-panel details:first-of-type{ margin-top:10px; }
+.ctl-panel summary{ font-weight:700; cursor:pointer; padding:4px 0; }
+.ctl{ display:grid; gap:4px; margin:10px 0; }
+.ctl label{ display:flex; justify-content:space-between; gap:8px; font-size:13.5px; font-weight:600; }
+.ctl label output{ font-weight:700; color:var(--orange); font-variant-numeric:tabular-nums; }
+.ctl select{ padding:6px 8px; border-radius:7px; border:1px solid var(--line); background:var(--panel2); }
+.ctl input[type=range]{ width:100%; accent-color:var(--orange); }
+.ctl.chk label{ justify-content:flex-start; align-items:center; gap:8px; }
+.ctl.chk input{ accent-color:var(--orange); width:17px; height:17px; }
+.ctl.dis{ opacity:.45; }
+.points ul{ margin:8px 0 0; padding-left:20px; } .points li{ margin:5px 0; }
+
+/* ---------- wiggers ---------- */
+.wig-head{ display:flex; flex-wrap:wrap; gap:8px 16px; align-items:center; justify-content:space-between; }
+.wig-grid{ display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:16px; margin-top:12px; }
+@media (max-width:1060px){ .wig-grid{ grid-template-columns:minmax(0,1fr); } }
+.wig-cv canvas{ display:block; width:100%; touch-action:none; cursor:ew-resize; border-radius:6px; }
+.chips{ display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+.chip{ border:1px solid var(--line); background:var(--panel2); border-radius:999px; padding:4px 11px; font-size:13px; font-weight:600; cursor:pointer; }
+.chip[aria-pressed=true]{ background:var(--orange); color:var(--on-accent); border-color:var(--orange); }
+.wig-info{ background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:14px; font-size:14px; }
+.wig-info h3{ font-size:17px; margin:2px 0 4px; }
+.wig-info .valves{ font-size:13px; color:var(--muted); font-weight:600; }
+.wig-info dl{ margin:10px 0 0; display:grid; grid-template-columns:auto 1fr; gap:6px 10px; }
+.wig-info dt{ font-weight:800; font-size:12.5px; }
+.wig-info dd{ margin:0; }
+.wig-info .note{ margin:10px 0 0; font-size:12.5px; color:var(--muted); }
+.legend{ font-size:12.5px; color:var(--muted); margin-top:8px; }
+
+/* ---------- learn ---------- */
+.mods{ display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; }
+.mod{ flex:0 0 auto; text-align:left; border:1px solid var(--line); background:var(--panel); border-radius:9px; padding:8px 12px; cursor:pointer; min-width:150px; }
+.mod b{ display:block; font-size:13.5px; }
+.mod small{ color:var(--muted); font-size:12px; }
+.mod[aria-current]{ border-color:var(--orange); box-shadow:inset 0 -3px 0 var(--orange); }
+.mod.done small{ color:var(--good); font-weight:700; }
+.step .body p{ margin:8px 0; } .step .body ul{ margin:8px 0; padding-left:20px; } .step .body li{ margin:3px 0; }
+.sw{ display:inline-block; width:11px; height:11px; border-radius:2px; vertical-align:-1px; margin-right:4px; }
+.acts{ margin:10px 0; }
+.q{ margin-top:14px; border-top:1px solid var(--line); padding-top:12px; }
+.q .stem{ font-weight:700; margin:0 0 10px; }
+.opts{ display:grid; gap:8px; }
+.opt{ text-align:left; border:1px solid var(--line); background:var(--panel2); border-radius:8px; padding:9px 12px; cursor:pointer; display:flex; gap:10px; }
+.opt:hover:not(:disabled){ border-color:var(--orange); }
+.opt .ltr{ font-weight:800; color:var(--orange); }
+.opt:disabled{ cursor:default; }
+.opt.right{ border-color:var(--good); background:var(--goodbg); }
+.opt.wrong{ border-color:var(--red); background:var(--redbg); }
+.opt.right .ltr{ color:var(--good); } .opt.wrong .ltr{ color:var(--red); }
+.fb{ margin-top:10px; border-radius:8px; padding:10px 12px; font-size:14px; border-left:4px solid var(--good); background:var(--goodbg); }
+.fb.no{ border-left-color:var(--red); background:var(--redbg); }
+.nav{ display:flex; gap:8px; margin-top:16px; align-items:center; }
+.prog{ height:6px; background:var(--chip); border-radius:99px; overflow:hidden; margin-top:8px; }
+.prog span{ display:block; height:100%; background:var(--orange); }
+
+/* ---------- assessment ---------- */
+.res-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; margin:12px 0; }
+.res-grid .card{ padding:12px 14px; }
+.res-grid b{ font-size:22px; display:block; }
+.review{ display:grid; gap:10px; margin-top:12px; }
+.review .card{ border-left:4px solid var(--good); }
+.review .card.no{ border-left-color:var(--red); }
+.watch{ font-size:13px; font-weight:700; color:var(--orange); margin:0 0 8px; }
+
+footer.ft{ max-width:1400px; margin:0 auto; padding:4px 16px 32px; color:var(--muted); font-size:12.5px; }
+@media print{ .top, .mon, #monHost, .wig, .no-print{ display:none !important; } body{ background:#fff; } }
+</style>
+</head>
+<body>
+<script>window.WL_VARIANT='learn';</script>
+<header class="top">
+  <div>
+    <h1><a href="index.html">CICU Waveform Lab</a></h1>
+    <p class="sub">Bedside monitor waveforms for pediatric cardiac ICU providers</p>
+  </div>
+  <nav class="toolnav" aria-label="Modes">
+    <a href="teach.html" data-v="teach">Teach</a>
+    <a href="learn.html" data-v="learn">Learn</a>
+    <a href="assess.html" data-v="assess">Knowledge Assessment</a>
+  </nav>
+</header>
+<main class="wrap" id="app"></main>
+<footer class="ft">Texas Center for Pediatric and Congenital Heart Disease · APP education. Independent approximation of a Philips IntelliVue–style bedside monitor for education only. Not a Philips product or a medical device. Waveforms are illustrative teaching models, not patient data.</footer>
+<script>
+(()=>{
+'use strict';
+const VARIANT = window.WL_VARIANT || 'teach';
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const g=(x,c,w)=>{const z=(x-c)/w; return Math.exp(-z*z);};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const store={
+  get(k,d){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } },
+  set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+};
+const FS=250, DT=1/FS;
+const COL={ecg:'#00F23A', abp:'#FF3B30', cvp:'#3F8CFF', pleth:'#00E1FF', co2:'#FFE34A'};
+
+/* =================== physiology parameters & scenarios =================== */
+const BASE={
+  rhythm:'sinus', hr:130, atrialRate:130, pr:0.11, pvcRate:0.16, cpr:0,
+  sys:86, dia:50, runoff:1, damping:'optimal',
+  cvp:8, aWave:4, vWave:3.2, cvPattern:'normal',
+  spo2:98, perf:1, motion:0,
+  vent:'ppv', rr:24, swing:2, ppv:0.06, etco2:38, capno:'normal',
+  limits:{hr:[90,180], sys:[60,110], spo2:[90,100], etco2:[30,50]},
+  bed:'CICU 04', patient:'Infant · 4 mo · 5.8 kg', dx:'POD 1 · VSD repair'
+};
+const NEO={patient:'Neonate · 7 d · 3.4 kg', limits:{hr:[100,190], sys:[50,100], spo2:[90,100], etco2:[30,50]}};
+const SV_LIM={hr:[100,190], sys:[50,100], spo2:[70,90], etco2:[20,45]};
+
+const SCN={
+ baseline:{name:'Baseline · post-op biventricular repair', p:{},
+  pts:['Start with signal quality: crisp ECG, sharp arterial upstroke with a visible dicrotic notch, distinct CVP waves, a clean pleth.',
+   'Line up one beat from top to bottom: P → QRS → arterial upstroke → pleth upstroke. Each later signal is delayed by mechanical events and pulse travel time.',
+   'On the CVP find a (after P), c (just after QRS), x descent, v (after T) and y descent.',
+   'CVP and arterial pressure rise slightly with each positive-pressure breath: read CVP at end-expiration.',
+   'Capnogram: flat inspiratory baseline, sharp upstroke, near-flat alveolar plateau.']},
+ overdamped:{name:'Arterial line · overdamped', p:{dx:'POD 1 · radial arterial line'},
+  pts:['Rounded, slurred upstroke; the dicrotic notch disappears.','Displayed systolic falls and diastolic rises; MAP is relatively preserved.','Press Fast flush: slow return to the waveform with no oscillation.','Look for air bubbles, clot, kinks, loose connections, a positional catheter or compliant tubing.'],
+  q:{damping:'over'}},
+ underdamped:{name:'Arterial line · underdamped (ringing)', p:{hr:150, sys:90, dia:48, damping:'under', dx:'POD 1 · radial arterial line'},
+  pts:['Tall, narrow systolic spike with ringing after the upstroke.','Systolic is overestimated (compare with a cuff pressure); MAP stays closest to the true value.','Fast flush: several oscillations before the waveform settles.','Fast infant heart rates move the signal’s frequency content closer to the system’s natural frequency, so ringing is common. Shorten tubing, remove extra stopcocks/extensions, or use a damping device.']},
+ jet:{name:'Junctional ectopic tachycardia (JET)', p:{patient:'Infant · 5 mo · 6.1 kg', dx:'POD 0 · tetralogy of Fallot repair', rhythm:'jet', hr:192, atrialRate:135, sys:70, dia:46, cvp:13, etco2:33, spo2:96},
+  pts:['Narrow-complex tachycardia faster than the sinus rate; P waves march through at a slower, unrelated rate (AV dissociation).','CVP: intermittent cannon a waves whenever the atrium contracts against a closed tricuspid valve.','Loss of AV synchrony and very short diastole lower stroke volume: pulse pressure narrows.','Most common in the first 24–72 h after surgery near the AV node (TOF, VSD, AVSD repair).']},
+ chb:{name:'Complete heart block', p:{patient:'Infant · 6 mo · 6.4 kg', dx:'POD 1 · complete AVSD repair', rhythm:'chb', hr:62, atrialRate:140, sys:72, dia:36, cvp:10},
+  pts:['P waves at ~140, wide escape rhythm at ~60, no consistent PR interval.','Cannon a waves appear whenever a P wave lands inside ventricular systole, so they come and go.','Long diastole: low diastolic pressure; cardiac output falls because rate is low.','Check epicardial pacing wires and backup pacing.']},
+ flutter:{name:'Atrial flutter 2:1 · after Fontan', p:{patient:'Child · 9 y · 28 kg', bed:'CICU 11', dx:'Post-op · extracardiac Fontan', rhythm:'flutter', hr:150, sys:94, dia:60, cvp:16, cvPattern:'fontan', vent:'spont', rr:22, swing:3, spo2:92, etco2:36, limits:{hr:[60,130], sys:[80,120], spo2:[85,100], etco2:[30,50]}},
+  pts:['Regular narrow-complex tachycardia at a fixed rate; sawtooth flutter waves in lead II.','No discrete a wave on the venous tracing: no organized atrial contraction.','AV synchrony and rate matter a great deal for Fontan preload; flutter is poorly tolerated.','Here the “CVP” is the Fontan pathway (pulmonary artery) pressure.']},
+ pvc:{name:'PVCs · pulse deficit', p:{rhythm:'pvc', dx:'POD 1 · hypokalemia (K 2.8)'},
+  pts:['Wide, premature QRS with no preceding P wave, then a compensatory pause.','The PVC makes a small arterial and pleth pulse; the next sinus beat is larger (longer filling plus post-extrasystolic potentiation).','Compare HR (from ECG) with Pulse (from pleth): pulse rate is lower when PVCs do not perfuse.','The sinus P wave that falls inside the PVC lands during ventricular systole: watch for a cannon a wave.']},
+ tr:{name:'Tricuspid regurgitation · large cv wave', p:{patient:'Infant · 3 mo · 4.9 kg', dx:'POD 2 · repair with residual tricuspid regurgitation', cvPattern:'tr', cvp:14, vWave:9},
+  pts:['A large systolic “cv” wave replaces the c wave, x descent and v wave.','Timing is the clue: it starts with the QRS and peaks after the T wave, as regurgitant flow fills the RA during systole.','The mean CVP overstates RV filling pressure when the v wave is large; the pressure at end-diastole (around the a wave) is a better estimate.']},
+ tamponade:{name:'Post-op tamponade', p:Object.assign({}, NEO, {dx:'POD 0 · arterial switch, 6 h post-op', hr:178, sys:66, dia:50, cvp:17, cvPattern:'tamponade', ppv:0.3, swing:3, etco2:27, spo2:95}),
+  pts:['Tachycardia, low arterial pressure with a narrow pulse pressure, rising CVP.','Exaggerated beat-to-beat respiratory variation in arterial pressure.','CVP: blunted or absent y descent because early diastolic filling is restricted.','EtCO₂ falls as cardiac output and pulmonary blood flow fall.','A sudden drop in chest-tube output can come first. Bedside echo; surgical team; prepare to open the chest.']},
+ bt:{name:'Norwood with BT shunt · diastolic runoff', p:{patient:'Neonate · 8 d · 3.2 kg', dx:'POD 2 · Norwood with modified BT shunt', hr:152, sys:76, dia:30, runoff:2.4, cvp:7, spo2:81, etco2:29, limits:SV_LIM},
+  pts:['Wide pulse pressure with a low diastolic pressure: blood runs off into the pulmonary arteries through the shunt during diastole.','Steep diastolic decline after the dicrotic notch.','SpO₂ around 75–85% is often the target in shunt-dependent physiology; follow patient-specific limits.','EtCO₂ underestimates PaCO₂ more than usual (limited pulmonary blood flow increases dead space). Trend it.','Coronary perfusion depends on diastolic pressure: watch the diastolic number.']},
+ shunt:{name:'Norwood · sudden change (watch ~30 s)', p:{patient:'Neonate · 8 d · 3.2 kg', dx:'POD 2 · Norwood with modified BT shunt', hr:152, sys:76, dia:30, runoff:2.4, cvp:7, spo2:81, etco2:29, limits:SV_LIM},
+  tl:[{at:8, ramp:{etco2:12}, dur:7},{at:8, ramp:{dia:44, sys:84, runoff:1}, dur:12},{at:12, ramp:{spo2:56, hr:172}, dur:25}],
+  pts:['EtCO₂ falls abruptly while the capnogram keeps its normal shape: less blood is reaching the lungs.','SpO₂ follows, a little later.','Diastolic pressure rises and pulse pressure narrows: diastolic runoff through the shunt has stopped.','In a shunt-dependent patient this is shunt occlusion until proven otherwise: an emergency. Call for help and follow your shunt-occlusion protocol.']},
+ ett:{name:'Unplanned extubation (watch ~45 s)', p:{dx:'POD 1 · intubated, back from CT'},
+  tl:[{at:6, set:{capno:'flat'}},{at:16, ramp:{spo2:70}, dur:40},{at:42, ramp:{hr:96}, dur:20}],
+  pts:['The capnogram goes flat abruptly: no exhaled CO₂ is reaching the sensor.','SpO₂ falls later: oximetry lags.','DOPE: Displacement, Obstruction, Pneumothorax, Equipment. A flat line with a beating heart is displacement or disconnection until proven otherwise.','Bradycardia is a late, ominous sign in infants.']},
+ bronch:{name:'Airway obstruction · shark-fin capnogram', p:{dx:'POD 1 · reactive airways / secretions', capno:'obstructive', etco2:56, spo2:93, ppv:0.1, swing:4.5, cvp:10},
+  pts:['Shark-fin capnogram: slow phase II rise with a sloped phase III (increased α angle).','Seen with bronchospasm, a kinked or partially obstructed ETT, or secretions.','Gas trapping raises intrathoracic pressure: larger respiratory swings and a higher CVP.','EtCO₂ climbs from hypoventilation.']},
+ lowco:{name:'Low cardiac output (watch ~60 s)', p:Object.assign({}, NEO, {dx:'POD 0 · arterial switch, evening of surgery', hr:182, sys:62, dia:46, cvp:13, perf:0.35, etco2:27, spo2:94}),
+  tl:[{at:5, ramp:{etco2:20, sys:55, dia:43, perf:0.2, cvp:15}, dur:60}],
+  pts:['Narrow pulse pressure (low stroke volume), tachycardia, rising CVP.','Small pleth / low perfusion index: peripheral vasoconstriction.','EtCO₂ falling while ventilation is unchanged suggests falling pulmonary blood flow and cardiac output.','Pair with exam, lactate, NIRS and urine output. Low cardiac output is most common about 6–18 h after bypass.']},
+ hypovol:{name:'Hypovolemia under positive-pressure ventilation', p:{dx:'POD 0 · bleeding, chest-tube output rising', hr:168, sys:70, dia:40, cvp:3, ppv:0.32, swing:2, etco2:33, perf:0.6},
+  pts:['Large, cyclic pulse-pressure variation with each positive-pressure breath.','Low CVP.','Variation suggests preload responsiveness only if conditions are met: regular rhythm, controlled ventilation, closed chest, no spontaneous effort. Evidence in children is weaker than in adults.','Confirm with the clinical picture, chest-tube output, hemoglobin and the response to a measured bolus.']},
+ fontan:{name:'Fontan · spontaneous breathing', p:{patient:'Child · 4 y · 16 kg', bed:'CICU 09', dx:'POD 1 · extracardiac Fontan, extubated', hr:104, sys:94, dia:54, cvp:14, cvPattern:'fontan', vent:'spont', rr:22, swing:4, spo2:93, etco2:37, limits:{hr:[70,140], sys:[80,120], spo2:[85,100], etco2:[30,50]}},
+  pts:['The “CVP” catheter (IJ/SVC) measures Fontan pathway / pulmonary artery pressure: the pressure that drives blood through the lungs without a pump.','Low-amplitude waves with large respiratory swings; spontaneous inspiration lowers intrathoracic pressure and augments pulmonary blood flow.','Early post-op Fontan pressures are often ~10–15 mmHg; the transpulmonary gradient (Fontan − common atrial pressure) is often ~5–8.','Rising Fontan pressure: think high PVR, pathway obstruction or thrombus, ventricular dysfunction, AV-valve regurgitation or arrhythmia.']},
+ vf:{name:'VF arrest · CPR → ROSC (watch ~20 s)', p:{dx:'Cardiac arrest · CPR in progress', rhythm:'vf', cpr:1, sys:58, dia:26, cvp:12, spo2:72, etco2:13, rr:30},
+  tl:[{at:14, set:{rhythm:'sinus', cpr:0, hr:168, sys:80, dia:44, etco2:46}},{at:16, ramp:{etco2:38, spo2:95}, dur:30}],
+  pts:['VF on the ECG with compression artifact; arterial pulses are produced by compressions.','With an arterial line, diastolic pressure during CPR reflects compression quality (AHA pediatric guidance suggests ≥25 mmHg in infants, ≥30 mmHg in children).','EtCO₂ reflects the pulmonary blood flow that compressions generate; persistently very low values suggest poor CPR quality.','After defibrillation, watch for an abrupt, sustained rise in EtCO₂ with an organized rhythm: ROSC.']}
+};
+// scenario q (quick override) used only by overdamped
+Object.values(SCN).forEach(s=>{ if(s.q) Object.assign(s.p,s.q); });
+const SCN_ORDER=['baseline','overdamped','underdamped','jet','chb','flutter','pvc','tr','tamponade','bt','shunt','ett','bronch','lowco','hypovol','fontan','vf'];
+
+const DAMP={optimal:{fn:22,z:0.55}, over:{fn:6,z:1.4}, under:{fn:11,z:0.1}};
+
+/* =================== simulation engine =================== */
+class Sim{
+  constructor(){
+    this.t=0; this.P=this.merge({}); this.bph=0; this.fy=this.P.dia; this.fv=0;
+    this.flushUntil=-1; this.zeroUntil=-1; this.zeroDoneUntil=-1;
+    this.tl=[]; this.ramps=[]; this.loadT=0; this.onChange=null;
+    this.resetStats(); this.clearEvents();
+  }
+  merge(p){
+    const P=JSON.parse(JSON.stringify(BASE)), q=JSON.parse(JSON.stringify(p||{}));
+    Object.assign(P,q); P.limits=Object.assign({},BASE.limits,q.limits||{}); return P;
+  }
+  resetStats(){
+    this.beats=[]; this.curMax=-1e9; this.curMin=1e9; this.statBeat=null; this.lastBeatPush=this.t;
+    this.artBuf=[]; this.cvpBuf=[]; this.co2Max=-1; this.co2Min=99;
+    this.spDisp=this.P.spo2; this.etDisp=this.P.capno==='flat'?0:this.P.etco2; this.imDisp=0;
+  }
+  clearEvents(){ this.atr=[]; this.ven=[]; this.labels=[]; this.nextP=this.t+0.05; this.nextA=this.t+0.05; this.nextV=this.t+0.15; this.lastPvc=false; this.potentiate=false; }
+  load(s, extra){
+    this.P=this.merge(Object.assign({}, s.p||{}, extra||{}));
+    this.tl=(s.tl||[]).map(e=>Object.assign({},e,{abs:this.t+e.at,done:false}));
+    this.ramps=[]; this.flushUntil=this.zeroUntil=this.zeroDoneUntil=-1; this.loadT=this.t;
+    this.invalidate(); this.resetStats();
+  }
+  set(k,v){ this.P[k]=v; this.ramps=this.ramps.filter(r=>r.k!==k); this.invalidate(); }
+  invalidate(){
+    const t=this.t, P=this.P, linked=(P.rhythm==='sinus'||P.rhythm==='pvc');
+    this.ven.forEach(e=>{ if(e.t>t) e.dead=1; });
+    const cutA=linked? t-P.pr : t;
+    this.atr.forEach(e=>{ if(e.t>cutA) e.dead=1; });
+    this.ven=this.ven.filter(e=>!e.dead); this.atr=this.atr.filter(e=>!e.dead);
+    this.labels=this.labels.filter(l=>!l.ev||!l.ev.dead);
+    const lv=this.ven[this.ven.length-1], la=this.atr[this.atr.length-1], rr=60/P.hr;
+    this.nextV= lv? Math.max(t+0.02, lv.t+rr) : t+0.1;
+    this.nextP= lv? Math.max(lv.t+rr-P.pr, t-P.pr+0.03) : t+0.05;
+    const ar= P.rhythm==='flutter'? P.hr*2 : P.atrialRate;
+    this.nextA= la? Math.max(t+0.02, la.t+60/ar) : t+0.05;
+    this.lastPvc=false; this.potentiate=false;
+  }
+  phaseAt(tf){ let p=this.bph+(tf-this.t)*this.P.rr/60; p-=Math.floor(p); return p; }
+  svMod(ph){ const P=this.P; return P.vent==='spont'? 1-P.ppv/2*Math.cos(2*Math.PI*(ph-0.2)) : 1+P.ppv/2*Math.cos(2*Math.PI*(ph-0.17)); }
+  lab(t,ch,text,pos,ev,fn){ this.labels.push({t,ch,text,pos,ev,fn}); }
+  addA(t,kind){
+    const a={t,kind}; this.atr.push(a);
+    if(kind==='p'){ this.lab(t+0.04,'ecg','P','up',a); this.lab(t+0.1,'cvp','a','up',a,()=>this.isCannon(a)?'cannon a':'a'); }
+  }
+  addV(t,o){
+    const P=this.P, prev=this.ven[this.ven.length-1], rrM=60/P.hr, rr=prev? t-prev.t : rrM;
+    const qt=0.39*Math.sqrt(clamp(rr,0.25,1.6))+(o.wide?0.04:0);
+    const b={t,rr,qt,wide:!!o.wide,pvc:!!o.pvc,cpr:!!o.cpr};
+    b.up=t+(o.cpr?0.03:0.085+(o.wide?0.03:0));
+    b.et=o.cpr?0.2:qt-0.03;
+    let sv=o.sv==null?1:o.sv;
+    if(P.rhythm==='afib') sv*=clamp(0.5+0.5*rr/rrM,0.45,1.25);
+    if(P.rhythm==='jet'||P.rhythm==='chb'){ if(!this.atr.some(a=>a.t>t-0.3&&a.t<t-0.07)) sv*=0.85; }
+    const svm=this.svMod(this.phaseAt(b.up));
+    b.sv=sv; b.svm=svm;
+    b.dia= o.cpr? P.dia : P.dia+clamp((rrM-rr)/rrM,-0.6,0.5)*6*P.runoff;
+    b.sys= Math.max(b.dia+4, b.dia+(P.sys-P.dia)*sv*svm);
+    b.pa= P.perf*clamp(sv*(1+(svm-1)*1.3),0,1.5)*(o.cpr?0.22:1);
+    b.p0= t+(o.cpr?0.1:0.2);
+    b.pulse= !o.cpr && sv*svm>0.5;
+    this.ven.push(b);
+    if(!o.cpr){
+      this.lab(t,'ecg',o.pvc?'PVC':'QRS','up',b);
+      this.lab(t+qt-0.07,'ecg','T','up',b);
+      this.lab(b.up,'abp','dia','dn',b);
+      this.lab(b.up+0.085,'abp','sys','up',b);
+      this.lab(b.up+b.et+0.024,'abp','notch','dn',b);
+      if(P.cvPattern==='tr') this.lab(t+qt*0.62+0.03,'cvp','cv','up',b);
+      else { this.lab(t+0.06,'cvp','c','up',b); this.lab(t+qt*0.62,'cvp','x','dn',b); this.lab(t+qt+0.035,'cvp','v','up',b); }
+      this.lab(t+qt+0.15,'cvp','y','dn',b);
+      this.lab(b.p0+0.14,'pleth','peak','up',b);
+    }
+  }
+  schedule(until){
+    const P=this.P, R=P.rhythm;
+    if(R==='sinus'||R==='pvc'){
+      let guard=0;
+      while(this.nextP<until && guard++<40){
+        const p=this.nextP, rr=60/P.hr*(1+(Math.random()-.5)*0.03);
+        this.addA(p,'p');
+        const lv=this.ven[this.ven.length-1];
+        if(R==='pvc' && !this.lastPvc && lv && Math.random()<P.pvcRate){
+          this.addV(lv.t+0.58*(60/P.hr),{wide:1,sv:0.35,pvc:1});
+          this.lastPvc=true; this.potentiate=true; this.nextP=p+rr; continue;
+        }
+        this.lastPvc=false;
+        this.addV(p+P.pr,{sv:this.potentiate?1.22:1}); this.potentiate=false;
+        this.nextP=p+rr;
+      }
+      return;
+    }
+    if(R==='jet'||R==='chb'||R==='flutter'){
+      const ar=R==='flutter'? P.hr*2 : P.atrialRate; let guard=0;
+      while(this.nextA<until && guard++<80){ this.addA(this.nextA, R==='flutter'?'f':'p'); this.nextA+=60/ar*(R==='flutter'?1:(1+(Math.random()-.5)*0.03)); }
+    }
+    let guard=0;
+    while(this.nextV<until && guard++<40){
+      if(R==='vf'){ if(P.cpr){ this.addV(this.nextV,{cpr:1}); this.nextV+=60/110; } else this.nextV=until; continue; }
+      let rr=60/P.hr; if(R==='afib') rr*=0.62+Math.random()*0.76;
+      this.addV(this.nextV,{wide:R==='chb'?1:0}); this.nextV+=rr;
+    }
+  }
+  prune(t){
+    if(this.atr.length>4) this.atr=this.atr.filter((e,i,a)=>e.t>t-2.5||i>=a.length-2);
+    if(this.ven.length>4) this.ven=this.ven.filter((e,i,a)=>e.t>t-2.5||i>=a.length-2);
+  }
+  isCannon(a){
+    if(a.cannon!==undefined) return a.cannon;
+    const ap=a.t+0.1, lv=this.ven[this.ven.length-1];
+    if(!lv||lv.t<ap) return false;
+    a.cannon=this.ven.some(b=>!b.cpr && ap>b.t+0.03 && ap<b.t+b.qt+0.03);
+    return a.cannon;
+  }
+  ecgAt(t){
+    const P=this.P; let v=0;
+    for(const a of this.atr){ if(a.kind!=='p') continue; const d=t-a.t; if(d<-0.1||d>0.2) continue; v+=0.15*g(d,0.04,0.022); }
+    if(P.rhythm==='flutter'){ let ph=t*(P.hr*2/60); ph-=Math.floor(ph); v+=0.17*(ph<0.75? 0.5-ph/0.75 : -0.5+(ph-0.75)/0.25); }
+    if(P.rhythm==='afib') v+=0.045*(Math.sin(2*Math.PI*7.3*t)+0.7*Math.sin(2*Math.PI*5.1*t+1)+0.5*Math.sin(2*Math.PI*9.7*t+2));
+    if(P.rhythm==='vf') v+=(0.45*Math.sin(2*Math.PI*4.6*t)+0.3*Math.sin(2*Math.PI*6.1*t+1.3)+0.2*Math.sin(2*Math.PI*3.3*t+0.4))*(0.7+0.3*Math.sin(2*Math.PI*0.27*t));
+    for(const b of this.ven){
+      const d=t-b.t; if(d<-0.08||d>0.75) continue;
+      if(b.cpr){ v+=0.4*g(d,0.06,0.05); continue; }
+      if(b.wide){ v+=0.95*g(d,0.025,0.026)-0.45*g(d,0.085,0.03)-0.3*g(d,b.qt-0.06,0.05); }
+      else { v+=-0.08*g(d,-0.018,0.008)+1.1*g(d,0,0.0085)-0.25*g(d,0.02,0.009)+0.34*g(d,b.qt-0.07,0.04); }
+    }
+    return v;
+  }
+  artRaw(t){
+    const v=this.ven; let k=-1;
+    for(let i=v.length-1;i>=0;i--){ if(v[i].up<=t){k=i;break;} }
+    if(k<0){ this.curBeat=null; return this.P.dia; }
+    const b=v[k], n=v[k+1]; this.curBeat=b;
+    const s=t-b.up, rrM=60/this.P.hr, D=n? n.up-b.up : Math.max(rrM,b.rr), nd=n? n.dia : this.P.dia, PP=b.sys-b.dia;
+    if(s>D) return 12+(nd-12)*Math.exp(-(s-D)/1.2);
+    const tr=b.cpr?0.12:0.075, et=Math.min(b.et, D*0.6);
+    if(s<tr) return b.dia+PP*0.5*(1-Math.cos(Math.PI*s/tr));
+    if(b.cpr){
+      if(s<et) return b.sys-PP*0.15*(s-tr)/(et-tr);
+      const e0=b.sys-PP*0.15, x=s-et, L=Math.max(0.02,D-et);
+      return e0+(nd-e0)*Math.min(1,(1-Math.exp(-x/0.1))/(1-Math.exp(-L/0.1)));
+    }
+    if(s<et){ const u=(s-tr)/(et-tr); return b.dia+PP*(1-0.28*Math.pow(u,1.4)); }
+    const e0=b.dia+PP*0.72, no=b.dia+PP*0.6, rb=b.dia+PP*0.665, n1=0.022, n2=0.05;
+    if(s<et+n1){ const u=(s-et)/n1; return e0+(no-e0)*0.5*(1-Math.cos(Math.PI*u)); }
+    if(s<et+n1+n2){ const u=(s-et-n1)/n2; return no+(rb-no)*0.5*(1-Math.cos(Math.PI*u)); }
+    const x=s-et-n1-n2, L=Math.max(0.02,D-et-n1-n2), tau=0.2/this.P.runoff;
+    return rb+(nd-rb)*Math.min(1,(1-Math.exp(-x/tau))/(1-Math.exp(-L/tau)));
+  }
+  cvpAt(t){
+    const P=this.P, pat=P.cvPattern, f=pat==='fontan'?0.3:1;
+    let v=P.cvp-(pat==='tr'?2.5:1)*f;
+    if(P.rhythm!=='afib' && P.rhythm!=='vf'){
+      for(const a of this.atr){ if(a.kind!=='p') continue; const ap=a.t+0.1; if(t<ap-0.16||t>ap+0.16) continue; v+=P.aWave*f*(this.isCannon(a)?2.6:1)*g(t,ap,0.04); }
+    }
+    if(P.rhythm==='flutter') v+=0.45*f*Math.sin(2*Math.PI*(P.hr*2/60)*t);
+    if(P.rhythm==='afib') v+=0.3*f*Math.sin(2*Math.PI*6.3*t);
+    const yd= pat==='tamponade'?0.15 : pat==='restrictive'?2.4 : 1;
+    for(const b of this.ven){
+      const d=t-b.t; if(d<-0.1||d>0.9) continue;
+      if(b.cpr){ v+=12*g(d,0.08,0.06); continue; }
+      if(pat==='tr') v+=P.vWave*g(d,b.qt*0.62+0.03,0.085);
+      else { v+=1.3*f*g(d,0.06,0.022); v-=1.8*f*(pat==='tamponade'?1.3:1)*g(d,b.qt*0.62,0.05); v+=P.vWave*f*g(d,b.qt+0.035,0.05); }
+      v-=2*f*yd*g(d,b.qt+0.15,0.05);
+    }
+    return v;
+  }
+  plethAt(t){
+    const v=this.ven; let k=-1;
+    for(let i=v.length-1;i>=0;i--){ if(v[i].p0<=t){k=i;break;} }
+    if(k<0) return 0;
+    const b=v[k], n=v[k+1], s=t-b.p0, D=n? n.p0-b.p0 : Math.max(60/this.P.hr,b.rr);
+    if(s>D) return 0;
+    const tr=0.13, et=Math.min(b.qt, D*0.62); let f;
+    if(s<tr) f=0.5-0.5*Math.cos(Math.PI*s/tr);
+    else if(s<et) f=1-0.38*Math.pow((s-tr)/(et-tr),1.2);
+    else if(s<et+0.05) f=0.62-0.05*Math.sin(Math.PI*(s-et)/0.05);
+    else { const x=s-et-0.05, L=Math.max(0.02,D-et-0.05); f=0.62*(1-Math.min(1,(1-Math.exp(-x/0.16))/(1-Math.exp(-L/0.16)))); }
+    return b.pa*f;
+  }
+  co2At(ph){
+    const P=this.P; if(P.capno==='flat') return 0;
+    const fi=P.vent==='spont'?0.4:0.33, Tb=60/P.rr, et=P.etco2, ins=P.capno==='rebreath'?6:0;
+    if(ph<fi) return ins+(et-ins)*Math.exp(-ph*Tb/0.05);
+    const e=(ph-fi)/(1-fi);
+    let fN; if(e<0.05) fN=0; else if(e<0.17){ const u=(e-0.05)/0.12; fN=0.93*u*u*(3-2*u); } else fN=0.93+0.07*(e-0.17)/0.83;
+    let f=fN;
+    if(P.capno==='obstructive') f= e<0.05?0 : (1-Math.exp(-(e-0.05)/0.3))/(1-Math.exp(-0.95/0.3));
+    if(P.capno==='cleft' && e>0.5 && e<0.68) f-=0.3*Math.sin(Math.PI*(e-0.5)/0.18);
+    return ins+(et-ins)*f;
+  }
+  runTimeline(t){
+    for(const e of this.tl){
+      if(e.done||t<e.abs) continue; e.done=true;
+      if(e.set){ Object.assign(this.P,e.set); this.ramps=this.ramps.filter(r=>!(r.k in e.set)); this.invalidate(); }
+      if(e.ramp){ for(const k in e.ramp){ this.ramps=this.ramps.filter(r=>r.k!==k); this.ramps.push({k,from:this.P[k],to:e.ramp[k],t0:t,dur:e.dur||10}); } }
+      if(this.onChange) this.onChange();
+    }
+    if(this.ramps.length){
+      this.ramps=this.ramps.filter(r=>{ const u=clamp((t-r.t0)/r.dur,0,1); this.P[r.k]=r.from+(r.to-r.from)*u; return u<1; });
+    }
+  }
+  flush(){ this.flushUntil=this.t+0.6; }
+  zero(){ this.zeroUntil=this.t+2.5; this.zeroDoneUntil=this.t+6; }
+  step(){
+    const P=this.P; this.t+=DT; const t=this.t;
+    this.runTimeline(t);
+    const prev=this.bph; this.bph+=DT*P.rr/60; let wrapped=false; if(this.bph>=1){ this.bph-=1; wrapped=true; }
+    this.schedule(t+1.6); this.prune(t);
+    const ph=this.bph, fi=P.vent==='spont'?0.4:0.33, insp=ph<fi?Math.sin(Math.PI*ph/fi):0, itp=(P.vent==='spont'?-1:1)*insp*P.swing;
+    const ecg=this.ecgAt(t)+(Math.random()-.5)*0.025;
+    let u=this.artRaw(t)+0.5*itp; if(t<this.flushUntil) u=300; if(t<this.zeroUntil) u=0;
+    const D=DAMP[P.damping]||DAMP.optimal, wn=2*Math.PI*D.fn, h=DT/4;
+    for(let i=0;i<4;i++){ const acc=wn*wn*(u-this.fy)-2*D.z*wn*this.fv; this.fv+=acc*h; this.fy+=this.fv*h; }
+    const art=this.fy+(Math.random()-.5)*0.4;
+    const cvp=(t<this.zeroUntil?0:this.cvpAt(t)+itp)+(Math.random()-.5)*0.25;
+    let pl=this.plethAt(t)+0.025*itp+(Math.random()-.5)*0.012;
+    if(P.motion) pl+=0.5*Math.sin(2*Math.PI*1.1*t+3*Math.sin(t*0.7))+0.3*Math.sin(2*Math.PI*2.7*t)*Math.sin(t*0.9)+(Math.random()-.5)*0.15;
+    const co2=Math.max(0,this.co2At(ph)+(Math.random()-.5)*0.3);
+    // stats
+    const quiet= t<this.flushUntil+1.2 || t<this.zeroUntil+0.6;
+    if(this.curBeat!==this.statBeat){
+      if(this.statBeat && this.curMax>-1e8 && !quiet){ this.beats.push({max:this.curMax,min:this.curMin,t}); if(this.beats.length>6) this.beats.shift(); this.lastBeatPush=t; }
+      this.statBeat=this.curBeat; this.curMax=-1e9; this.curMin=1e9;
+    }
+    this.curMax=Math.max(this.curMax,art); this.curMin=Math.min(this.curMin,art);
+    if(!quiet){ this.artBuf.push(art); if(this.artBuf.length>FS*4) this.artBuf.shift(); }
+    this.cvpBuf.push(cvp); if(this.cvpBuf.length>FS*4) this.cvpBuf.shift();
+    this.spDisp+=(P.spo2-this.spDisp)*DT/3.5;
+    const labs=[];
+    if(wrapped){ this.etDisp=this.co2Max<0?0:this.co2Max; this.imDisp=Math.max(0,this.co2Min); this.co2Max=-1; this.co2Min=99; }
+    this.co2Max=Math.max(this.co2Max,co2); this.co2Min=Math.min(this.co2Min,co2);
+    if(P.capno!=='flat'){
+      const e0=(prev-fi)/(1-fi), e1=(ph-fi)/(1-fi);
+      if(wrapped) labs.push({ch:'co2',text:'0',pos:'dn'});
+      [[0.02,'I','dn'],[0.12,'II','up'],[0.6,'III','up']].forEach(([th,tx,pos])=>{ if(!wrapped && e0<th && e1>=th) labs.push({ch:'co2',text:tx,pos}); });
+    }
+    if(this.labels.length){
+      const keep=[];
+      for(const l of this.labels){ if(l.t<=t){ if(!(l.ev&&l.ev.dead)) labs.push({ch:l.ch,text:l.fn?l.fn():l.text,pos:l.pos}); } else keep.push(l); }
+      this.labels=keep;
+    }
+    return {ecg,abp:art,cvp,pleth:pl,co2,labs};
+  }
+  stats(){
+    const t=this.t, P=this.P, avg=a=>a.reduce((s,x)=>s+x,0)/a.length;
+    const real=this.ven.filter(b=>!b.cpr && b.t<=t);
+    let hr=null;
+    if(P.rhythm!=='vf' && real.length>=3 && t-real[real.length-1].t<2.5){ const r=real.slice(-5); hr=60*(r.length-1)/(r[r.length-1].t-r[0].t); }
+    const pul=this.ven.filter(b=>b.pulse && b.p0<=t);
+    let pulse=null;
+    if(!P.cpr && pul.length>=3 && t-pul[pul.length-1].p0<2.5){ const r=pul.slice(-5); pulse=60*(r.length-1)/(r[r.length-1].p0-r[0].p0); }
+    let sys=null,dia=null,map=null;
+    if(this.artBuf.length>FS){
+      map=avg(this.artBuf);
+      const rb=this.beats.filter(b=>t-b.t<3);
+      if(rb.length>=2){ const r=rb.slice(-4); sys=avg(r.map(b=>b.max)); dia=avg(r.map(b=>b.min)); }
+      else { sys=Math.max(...this.artBuf.slice(-FS*2)); dia=Math.min(...this.artBuf.slice(-FS*2)); }
+    }
+    const spq= P.motion || P.cpr || P.perf<0.12;
+    return {hr,pulse,sys,dia,map,cvp:this.cvpBuf.length?avg(this.cvpBuf):null,spo2:this.spDisp,spq,et:P.capno==='flat'?0:this.etDisp,im:P.capno==='flat'?0:this.imDisp,rr:P.capno==='flat'?0:P.rr,
+      zeroing:t<this.zeroUntil, zeroDone:t>=this.zeroUntil && t<this.zeroDoneUntil, settling:t-this.loadT<3};
+  }
+}
+
+/* =================== monitor renderer =================== */
+const MON_HTML=`<div class="mon" role="img" aria-label="Simulated bedside monitor showing ECG, arterial pressure, CVP, pleth and capnogram">
+ <div class="mon-top"><span class="bed"></span><span class="pt"></span><span class="alarm" aria-live="polite"></span><span class="sil" hidden>SILENCED</span><span class="clk"></span></div>
+ <div class="mon-body">
+  <div class="mon-waves"><canvas></canvas></div>
+  <div class="mon-nums">
+   <div class="nb" data-row="ecg" style="--c:${COL.ecg}"><div class="lab">HR<span class="lim" data-lim="hr"></span></div><div class="val"><span class="big" data-v="hr">--</span><span class="unit">bpm</span></div></div>
+   <div class="nb" data-row="abp" style="--c:${COL.abp}"><div class="lab">ABP<span class="lim" data-lim="sys"></span></div><div class="val"><span class="mid" data-v="sd">--/--</span><span class="sm" data-v="map">(--)</span></div></div>
+   <div class="nb" data-row="cvp" style="--c:${COL.cvp}"><div class="lab">CVP<span class="lim">mmHg</span></div><div class="val"><span class="mid" data-v="cvp">(--)</span></div></div>
+   <div class="nb" data-row="pleth" style="--c:${COL.pleth}"><div class="lab">SpO₂<span class="lim" data-lim="spo2"></span></div><div class="val"><span class="big" data-v="spo2">--</span><span class="sm" data-v="pulse">Pulse --</span><span class="sm" data-v="perf">Perf --</span></div></div>
+   <div class="nb" data-row="co2" style="--c:${COL.co2}"><div class="lab">etCO₂<span class="lim" data-lim="etco2"></span></div><div class="val"><span class="big" data-v="et">--</span><span class="sm" data-v="im">imCO₂ --</span><span class="sm" data-v="awrr">awRR --</span></div></div>
+  </div>
+ </div>
+ <div class="mon-keys"></div>
+</div>`;
+
+class Monitor{
+  constructor(host,sim,opt){
+    opt=opt||{};
+    this.sim=sim; this.labels=!!opt.labels; this.allowLabels=opt.allowLabels!==false; this.frozen=false; this.silencedUntil=0; this.alIdx=0;
+    host.innerHTML=MON_HTML; this.el=host.firstElementChild;
+    this.cv=$('canvas',this.el); this.ctx=this.cv.getContext('2d');
+    this.chs=['ecg','abp','cvp','pleth','co2'].map(k=>({k,color:COL[k],pend:[]}));
+    this.nb={}; $$('.nb',this.el).forEach(n=>this.nb[n.dataset.row]=n);
+    const keys=[['silence','Silence'],['freeze','Freeze']];
+    if(this.allowLabels) keys.push(['labels','Labels']);
+    keys.push(['flush','Fast flush'],['zero','Zero ABP']);
+    const kb=$('.mon-keys',this.el);
+    kb.innerHTML=keys.map(([k,l])=>`<button type="button" class="mk" data-k="${k}"${k==='freeze'||k==='labels'?' aria-pressed="false"':''}>${l}</button>`).join('');
+    kb.addEventListener('click',e=>{ const b=e.target.closest('.mk'); if(b) this.key(b.dataset.k); });
+    this.syncKeys();
+    let raf=0; this.ro=new ResizeObserver(()=>{ cancelAnimationFrame(raf); raf=requestAnimationFrame(()=>this.resize()); });
+    this.ro.observe($('.mon-waves',this.el)); this.ro.observe(this.el);
+    this.resize(); this.updateTop();
+    this.last=performance.now(); this.acc=0; this.nextNum=0;
+    requestAnimationFrame(n=>this.loop(n));
+  }
+  key(k){
+    if(k==='silence'){ this.silencedUntil=performance.now()+120000; this.updateNumerics(); }
+    if(k==='freeze'){ this.frozen=!this.frozen; }
+    if(k==='labels'){ this.labels=!this.labels; if(this.onLabels) this.onLabels(this.labels); }
+    if(k==='flush') this.sim.flush();
+    if(k==='zero') this.sim.zero();
+    this.syncKeys();
+  }
+  setLabels(v){ this.labels=!!v; this.syncKeys(); }
+  setFrozen(v){ this.frozen=!!v; this.syncKeys(); }
+  syncKeys(){
+    const f=$('.mk[data-k=freeze]',this.el); if(f){ f.setAttribute('aria-pressed',this.frozen); f.textContent=this.frozen?'Unfreeze':'Freeze'; }
+    const l=$('.mk[data-k=labels]',this.el); if(l) l.setAttribute('aria-pressed',this.labels);
+  }
+  scale(k){
+    const P=this.sim.P;
+    if(k==='ecg') return {min:-0.75,max:1.45,lines:[]};
+    if(k==='abp'){ const m=P.sys>110?180:120; return {min:0,max:m,lines:[m,m/2,0]}; }
+    if(k==='cvp'){ const m=P.cvp>11?30:20; return {min:0,max:m,lines:[m,m/2,0]}; }
+    if(k==='pleth') return {min:-0.2,max:1.4,lines:[]};
+    const m=P.etco2>50?80:50; return {min:0,max:m,lines:[m,0]};
+  }
+  rescale(){ const before=JSON.stringify(this.chs.map(c=>c.sc)); this.chs.forEach(c=>c.sc=this.scale(c.k)); if(JSON.stringify(this.chs.map(c=>c.sc))!==before) this.resize(); this.updateTop(); }
+  resize(){
+    const wv=$('.mon-waves',this.el), W=Math.max(200,wv.clientWidth);
+    const hs=this.chs.map(c=>this.nb[c.k].getBoundingClientRect().height);
+    const H=hs.reduce((a,b)=>a+b,0); if(!H) return;
+    const dpr=window.devicePixelRatio||1;
+    this.cv.style.height=H+'px'; this.cv.width=Math.round(W*dpr); this.cv.height=Math.round(H*dpr);
+    const ctx=this.ctx; ctx.setTransform(dpr,0,0,dpr,0,0);
+    this.W=W; this.H=H; this.L=W<520?34:46; this.R=W-3;
+    let y=0; this.chs.forEach((c,i)=>{ c.y0=y; c.h=hs[i]; y+=hs[i]; c.x=this.L; c.px=null; c.py=null; c.pend=[]; c.sc=c.sc||this.scale(c.k);
+      c.speed=(this.R-this.L)/(c.k==='co2'?18:4.5); });
+    ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
+    this.chs.forEach(c=>this.gutter(c));
+  }
+  Y(c,v){ const s=c.sc; return clamp(c.y0+5+(1-(v-s.min)/(s.max-s.min))*(c.h-10), c.y0+1, c.y0+c.h-1); }
+  gutter(c){
+    const ctx=this.ctx, small=this.L<40;
+    ctx.fillStyle='#000'; ctx.fillRect(0,c.y0,this.L,c.h);
+    ctx.fillStyle=c.color; ctx.font=`700 ${small?10:12}px Arial`; ctx.textBaseline='top'; ctx.textAlign='left';
+    ctx.fillText({ecg:'II',abp:'ABP',cvp:'CVP',pleth:'Pleth',co2:'CO₂'}[c.k],3,c.y0+4);
+    ctx.font=`${small?9:10}px Arial`; ctx.textBaseline='middle';
+    c.sc.lines.forEach((v,i)=>{ if(i===0) return; ctx.fillText(String(v),3,this.Y(c,v)-(v===0?5:0)); });
+    if(c.sc.lines.length) { ctx.fillText(String(c.sc.lines[0]),3,this.Y(c,c.sc.lines[0])+(small?14:17)); }
+    if(c.k==='ecg'){ const y1=this.Y(c,0), y2=this.Y(c,1); ctx.strokeStyle=c.color; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(this.L-10,y1); ctx.lineTo(this.L-10,y2); ctx.stroke(); ctx.textBaseline='top'; ctx.fillText('1mV',3,c.y0+c.h-14); }
+    this.dots(c,this.L,this.R);
+  }
+  dots(c,a,b){
+    if(!c.sc.lines.length) return;
+    const ctx=this.ctx; ctx.fillStyle=c.color; ctx.globalAlpha=0.55;
+    for(const v of c.sc.lines){ const y=Math.round(this.Y(c,v))+0.5; for(let x=Math.ceil(a/7)*7;x<b;x+=7) ctx.fillRect(x,y-0.5,1.6,1); }
+    ctx.globalAlpha=1;
+  }
+  erase(c,a,b){ a=Math.max(a,this.L); b=Math.min(b,this.R+3); if(b<=a) return; this.ctx.fillStyle='#000'; this.ctx.fillRect(a,c.y0,b-a,c.h); this.dots(c,a,Math.min(b,this.R)); }
+  destroy(){ this.dead=true; this.ro.disconnect(); }
+  loop(now){
+    if(this.dead) return;
+    const el=Math.min(0.1,(now-this.last)/1000); this.last=now;
+    if(!this.frozen && this.W){
+      this.acc+=el;
+      const seg=this.chs.map(()=>[]); let n=0;
+      const start=this.chs.map(c=>c.x);
+      while(this.acc>=DT && n<40){
+        this.acc-=DT; n++;
+        const s=this.sim.step();
+        this.chs.forEach((c,i)=>{
+          c.x+=c.speed*DT; let brk=false; if(c.x>=this.R){ c.x=this.L+(c.x-this.R); brk=true; }
+          const y=this.Y(c,s[c.k]); seg[i].push([c.x,y,brk]); c.cy=y;
+        });
+        if(this.labels && s.labs.length){ for(const l of s.labs){ const c=this.chs.find(q=>q.k===l.ch); if(c) c.pend.push({x:c.x,y:c.cy,text:l.text,pos:l.pos}); } }
+      }
+      if(n>=40) this.acc=0;
+      this.draw(seg,start);
+    }
+    if(now>=this.nextNum){ this.updateNumerics(); this.nextNum=now+1000; }
+    requestAnimationFrame(n2=>this.loop(n2));
+  }
+  draw(seg,start){
+    const ctx=this.ctx, gap=16;
+    this.chs.forEach((c,i)=>{
+      const pts=seg[i]; if(!pts.length) return;
+      const last=pts[pts.length-1], wrapped=pts.some(p=>p[2]), xs=start[i];
+      if(wrapped){ this.erase(c,xs+1,this.R+3); this.erase(c,this.L,last[0]+gap); }
+      else { this.erase(c,xs+1,last[0]+gap); if(last[0]+gap>this.R) this.erase(c,this.L,this.L+(last[0]+gap-this.R)); }
+      ctx.save(); ctx.beginPath(); ctx.rect(this.L,c.y0,this.R-this.L+3,c.h); ctx.clip();
+      ctx.strokeStyle=c.color; ctx.lineWidth=c.k==='ecg'?1.7:1.9; ctx.lineJoin='round';
+      ctx.beginPath(); if(c.px!=null) ctx.moveTo(c.px,c.py); else ctx.moveTo(pts[0][0],pts[0][1]);
+      for(const [x,y,brk] of pts){ if(brk){ ctx.stroke(); ctx.beginPath(); ctx.moveTo(x,y); } else ctx.lineTo(x,y); }
+      ctx.stroke(); ctx.restore();
+      c.px=last[0]; c.py=last[1];
+      if(c.pend.length){
+        const span=this.R-this.L;
+        c.pend=c.pend.filter(l=>{
+          ctx.font='600 11px Arial'; const hw=ctx.measureText(l.text).width/2;
+          let d=c.x-l.x; if(d<0) d+=span;
+          if(d<hw+3) return true;
+          if(d>span*0.5) return false;
+          let y=l.pos==='up'? l.y-9 : l.y+10; y=clamp(y,c.y0+8,c.y0+c.h-7);
+          const x=clamp(l.x,this.L+hw+1,this.R-hw-1);
+          ctx.fillStyle='rgba(0,0,0,.65)'; ctx.fillRect(x-hw-1,y-6,hw*2+2,12);
+          ctx.fillStyle='#F2F2F2'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(l.text,x,y);
+          return false;
+        });
+      }
+    });
+  }
+  updateTop(){
+    const P=this.sim.P; $('.bed',this.el).textContent=P.bed; $('.pt',this.el).textContent=P.patient;
+    const L=P.limits;
+    $('[data-lim=hr]',this.el).innerHTML=`${L.hr[1]}<br>${L.hr[0]}`;
+    $('[data-lim=sys]',this.el).innerHTML=`${L.sys[1]}<br>${L.sys[0]}`;
+    $('[data-lim=spo2]',this.el).innerHTML=`${L.spo2[1]}<br>${L.spo2[0]}`;
+    $('[data-lim=etco2]',this.el).innerHTML=`${L.etco2[1]}<br>${L.etco2[0]}`;
+  }
+  updateNumerics(){
+    const s=this.sim.stats(), P=this.sim.P, L=P.limits, r=Math.round, set=(k,v)=>{ const e=$(`[data-v=${k}]`,this.el); if(e) e.textContent=v; };
+    set('hr', s.hr==null?'-?-':r(s.hr));
+    if(s.zeroing||s.sys==null){ set('sd','-?-'); set('map','(-?-)'); }
+    else { set('sd',`${r(s.sys)}/${r(s.dia)}`); set('map',`(${r(s.map)})`); }
+    set('cvp', s.zeroing||s.cvp==null?'(-?-)':`(${r(s.cvp)})`);
+    set('spo2', s.spq?'-?-':r(s.spo2));
+    set('pulse', 'Pulse '+(s.pulse==null||s.spq?'-?-':r(s.pulse)));
+    set('perf', 'Perf '+(P.cpr?'-?-':(P.perf*1.6).toFixed(1)));
+    set('et', r(s.et)); set('im','imCO₂ '+r(s.im)); set('awrr','awRR '+r(s.rr));
+    const d=new Date(); $('.clk',this.el).textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+    // alarms
+    const al=[];
+    if(!s.settling){
+      if(P.rhythm==='vf') al.push(['red','***VFIB/VTACH','ecg']);
+      else if(s.hr!=null){ if(s.hr>L.hr[1]) al.push(['yel','**HR HIGH','ecg']); if(s.hr<L.hr[0]) al.push(['yel','**HR LOW','ecg']); }
+      if(s.sys!=null && !s.zeroing){ if(s.sys<L.sys[0]) al.push(['yel','**ABPs LOW','abp']); if(s.sys>L.sys[1]) al.push(['yel','**ABPs HIGH','abp']); }
+      if(s.spq) al.push(['cyan', P.motion?'SpO₂ NOISY SIGNAL':'SpO₂ LOW PERF', null]);
+      else if(s.spo2<L.spo2[0]-10) al.push(['red','***DESAT','pleth']);
+      else if(s.spo2<L.spo2[0]) al.push(['yel','**SpO₂ LOW','pleth']);
+      if(P.capno==='flat' || s.et<3) al.push(['red','***APNEA','co2']);
+      else { if(s.et<L.etco2[0]) al.push(['yel','**etCO₂ LOW','co2']); if(s.et>L.etco2[1]) al.push(['yel','**etCO₂ HIGH','co2']); }
+    }
+    if(s.zeroing) al.push(['cyan','ABP ZEROING',null]); else if(s.zeroDone) al.push(['cyan','ABP ZERO DONE',null]);
+    const rank={red:0,yel:1,cyan:2}; al.sort((a,b)=>rank[a[0]]-rank[b[0]]);
+    const silenced=performance.now()<this.silencedUntil;
+    $('.sil',this.el).hidden=!silenced;
+    const box=$('.alarm',this.el);
+    if(al.length){ this.alIdx=(this.alIdx+1)%al.length; const a=al[this.alIdx]; box.innerHTML=`<span class="${a[0]}${a[0]!=='cyan'&&!silenced?' flash':''}">${esc(a[1])}</span>`; }
+    else box.innerHTML='';
+    Object.entries(this.nb).forEach(([k,n])=>{ const hit=al.find(a=>a[2]===k); n.classList.toggle('al',!!hit&&!silenced); n.classList.toggle('red',!!hit&&hit[0]==='red'); n.classList.toggle('yel',!!hit&&hit[0]==='yel'); });
+  }
+}
+
+/* =================== Wiggers diagram =================== */
+function mono(k){
+  const n=k.length, xs=k.map(p=>p[0]), ys=k.map(p=>p[1]), d=[], m=new Array(n);
+  for(let i=0;i<n-1;i++) d.push((ys[i+1]-ys[i])/(xs[i+1]-xs[i]));
+  m[0]=d[0]; m[n-1]=d[n-2];
+  for(let i=1;i<n-1;i++) m[i]= d[i-1]*d[i]<=0?0:(d[i-1]+d[i])/2;
+  for(let i=0;i<n-1;i++){ if(d[i]===0){ m[i]=0; m[i+1]=0; continue; } const a=m[i]/d[i], b=m[i+1]/d[i], s=a*a+b*b; if(s>9){ const t=3/Math.sqrt(s); m[i]=t*a*d[i]; m[i+1]=t*b*d[i]; } }
+  return x=>{ let i=0; while(i<n-2 && x>xs[i+1]) i++; const h=xs[i+1]-xs[i], t=(x-xs[i])/h, t2=t*t, t3=t2*t;
+    return (2*t3-3*t2+1)*ys[i]+(t3-2*t2+t)*h*m[i]+(-2*t3+3*t2)*ys[i+1]+(t3-t2)*h*m[i+1]; };
+}
+const WT0=-0.14, WC=0.8;
+const cyc=f=>t=>f(((t-WT0)%WC+WC)%WC+WT0);
+const WK={
+  ao:[[-0.14,58],[0,52],[0.07,50],[0.1,72],[0.15,90],[0.19,92],[0.28,84],[0.31,80],[0.318,76],[0.335,79],[0.36,78],[0.66,58]],
+  lv:[[-0.14,4],[-0.08,4.5],[-0.03,8],[0,7],[0.02,9],[0.045,30],[0.07,51],[0.1,74],[0.15,93],[0.19,95],[0.28,86],[0.31,78],[0.35,40],[0.385,6],[0.42,2],[0.51,3],[0.66,4]],
+  la:[[-0.14,6],[-0.08,6],[-0.03,10],[0.01,5],[0.04,7],[0.07,6],[0.19,3],[0.31,8],[0.375,11],[0.4,10.3],[0.45,6],[0.51,5],[0.66,6]],
+  vol:[[-0.14,85],[-0.08,86],[-0.03,94],[0.02,100],[0.07,100],[0.12,80],[0.19,62],[0.31,45],[0.38,45],[0.45,70],[0.51,80],[0.66,85]],
+  art:[[-0.14,60],[0,54],[0.115,50],[0.14,66],[0.18,94],[0.21,100],[0.27,90],[0.33,84],[0.36,80],[0.375,72],[0.4,77],[0.43,75],[0.66,60]],
+  cvp:[[-0.14,4],[-0.08,4.2],[-0.04,7.5],[0,4.5],[0.04,5.6],[0.07,4.6],[0.2,2],[0.31,4.5],[0.375,6.6],[0.39,6.4],[0.46,3],[0.51,3.4],[0.66,4]],
+  pl:[[-0.14,0.32],[0,0.24],[0.12,0.18],[0.2,0.6],[0.26,0.95],[0.3,1],[0.4,0.7],[0.44,0.62],[0.46,0.64],[0.66,0.32]]
+};
+const PHASES=[
+ {n:1,name:'Atrial systole',t0:-0.08,t1:0.02,valves:'Mitral & tricuspid open · aortic & pulmonary closed',
+  mech:'The atria contract and top off ventricular filling: the “atrial kick.” It contributes more when the ventricle is stiff (hypertrophy, after bypass) and at fast heart rates, when passive filling time is short.',
+  ecg:'Follows the P wave; sits in the PR interval.', art:'End-diastole: the lowest point, just before the next upstroke.', cvp:'<b>a wave</b>: atrial contraction raises atrial pressure.', pleth:'Trough before the next pulse (the pleth runs later than the arterial line).'},
+ {n:2,name:'Isovolumic contraction',t0:0.02,t1:0.07,valves:'All four valves closed',
+  mech:'Ventricular pressure climbs steeply with no change in volume. The AV valves close at the start (S1).',
+  ecg:'QRS complex: ventricular depolarization starts the contraction.', art:'Still at the diastolic low point: no blood has left the ventricle yet, and the pulse still has to travel to the catheter.', cvp:'<b>c wave</b>: the closed tricuspid valve bulges back into the right atrium.', pleth:'Still at its trough.'},
+ {n:3,name:'Rapid ejection',t0:0.07,t1:0.19,valves:'Aortic & pulmonary open · AV valves closed',
+  mech:'Ventricular pressure exceeds aortic pressure, the semilunar valves open and most of the stroke volume is ejected.',
+  ecg:'ST segment.', art:'<b>Systolic upstroke</b> toward the peak, arriving at the radial or umbilical catheter a little later.', cvp:'<b>x descent</b>: atrial relaxation plus the tricuspid annulus pulled toward the apex.', pleth:'Starts its upstroke (later still).'},
+ {n:4,name:'Reduced ejection',t0:0.19,t1:0.31,valves:'Aortic & pulmonary open · AV valves closed',
+  mech:'Ejection slows; ventricular and aortic pressures fall together.',
+  ecg:'T wave (ventricular repolarization).', art:'Systolic peak, then the declining limb.', cvp:'Atria fill from the veins against a closed tricuspid valve: pressure builds toward the <b>v wave</b>.', pleth:'Upstroke and peak.'},
+ {n:5,name:'Isovolumic relaxation',t0:0.31,t1:0.38,valves:'All four valves closed',
+  mech:'The aortic and pulmonary valves close (S2). Ventricular pressure falls steeply with no change in volume.',
+  ecg:'End of the T wave.', art:'<b>Dicrotic notch</b> (incisura) from aortic valve closure. On a peripheral line it appears later and is shaped by reflected waves.', cvp:'<b>v wave</b> peaks just before the tricuspid valve opens.', pleth:'Declining limb; a small notch may show.'},
+ {n:6,name:'Rapid filling',t0:0.38,t1:0.5,valves:'Mitral & tricuspid open · aortic & pulmonary closed',
+  mech:'The AV valves open and blood rushes from the atria into the relaxing ventricles. An S3 can occur here.',
+  ecg:'Isoelectric (start of the TP segment).', art:'<b>Diastolic runoff</b>: pressure falls as blood flows to the periphery. A steep fall suggests runoff (shunt, PDA, aortic insufficiency).', cvp:'<b>y descent</b>: the right atrium empties into the ventricle.', pleth:'Diastolic decline.'},
+ {n:7,name:'Diastasis',t0:0.5,t1:0.66,valves:'Mitral & tricuspid open · aortic & pulmonary closed',
+  mech:'Slow passive filling. This phase shortens first as heart rate rises; at infant rates and in JET it can disappear, so filling depends more on early filling and the atrial kick.',
+  ecg:'TP segment, then the next P wave.', art:'Slow diastolic decline toward end-diastole.', cvp:'Slow rise toward the next a wave.', pleth:'Approaches its trough.'}
+];
+const WIG_HTML=`<section class="card wig" aria-labelledby="wigT">
+ <div class="wig-head"><div><div class="kicker">Cardiac cycle</div><h2 id="wigT">Wiggers diagram · one heartbeat</h2></div>
+  <div class="row"><button type="button" class="btn sec" data-w="prev">← Phase</button><button type="button" class="btn" data-w="play">Play</button><button type="button" class="btn sec" data-w="next">Phase →</button></div></div>
+ <p class="muted" style="margin:6px 0 0">Drag across the diagram (or focus it and use ← →) to move the cursor. The top rows are the classic left-heart Wiggers diagram; the bottom rows show how each phase appears on the bedside monitor. Drawn at 75 bpm so each phase is visible; at infant heart rates the cycle is about half as long, and diastole gives up most of the time.</p>
+ <div class="wig-grid"><div class="wig-cv"><canvas tabindex="0" aria-label="Wiggers diagram. Use left and right arrow keys to move through the cardiac cycle."></canvas>
+  <div class="chips" role="group" aria-label="Jump to phase">${PHASES.map((p,i)=>`<button type="button" class="chip" data-ph="${i}" aria-pressed="false">${p.n} · ${p.name}</button>`).join('')}</div>
+  <div class="legend">Valve markers: MC mitral closes · AO aortic opens · AC aortic closes · MO mitral opens. Pressures are illustrative.</div></div>
+  <aside class="wig-info" aria-live="polite"></aside></div>
+</section>`;
+
+class Wiggers{
+  constructor(root){
+    this.root=root; this.cv=$('canvas',root); this.ctx=this.cv.getContext('2d'); this.info=$('.wig-info',root);
+    this.cur=0.12; this.playing=false; this.ph=-1;
+    this.f={}; for(const k in WK) this.f[k]=cyc(mono(WK[k]));
+    const setFromX=x=>{ const r=this.cv.getBoundingClientRect(); this.setT(WT0+clamp((x-r.left-this.gx)/this.gw,0,0.9999)*WC); };
+    let drag=false;
+    this.cv.addEventListener('pointerdown',e=>{ drag=true; this.cv.setPointerCapture(e.pointerId); this.stop(); setFromX(e.clientX); });
+    this.cv.addEventListener('pointermove',e=>{ if(drag) setFromX(e.clientX); });
+    this.cv.addEventListener('pointerup',()=>drag=false);
+    this.cv.addEventListener('keydown',e=>{ if(e.key==='ArrowRight'||e.key==='ArrowLeft'){ e.preventDefault(); this.stop(); let t=this.cur+(e.key==='ArrowRight'?0.01:-0.01); if(t>=WT0+WC) t-=WC; if(t<WT0) t+=WC; this.setT(t); } });
+    root.addEventListener('click',e=>{
+      const c=e.target.closest('[data-ph]'); if(c){ this.stop(); this.setPhase(+c.dataset.ph); return; }
+      const b=e.target.closest('[data-w]'); if(!b) return;
+      if(b.dataset.w==='play') this.playing?this.stop():this.play();
+      else { this.stop(); const i=this.phaseIndex(this.cur), j=(i+(b.dataset.w==='next'?1:6))%7; this.setPhase(j); }
+    });
+    let raf=0; new ResizeObserver(()=>{ cancelAnimationFrame(raf); raf=requestAnimationFrame(()=>this.draw()); }).observe(this.cv.parentElement);
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>this.draw());
+    this.draw();
+  }
+  phaseIndex(t){ for(let i=0;i<7;i++){ if(t>=PHASES[i].t0&&t<PHASES[i].t1) return i; } return 6; }
+  setPhase(i){ const p=PHASES[i]; this.setT((p.t0+p.t1)/2); }
+  setT(t){ this.cur=t; this.draw(); }
+  play(){ this.playing=true; $('[data-w=play]',this.root).textContent='Pause'; let last=performance.now();
+    const tick=now=>{ if(!this.playing) return; const dt=(now-last)/1000; last=now; let t=this.cur+dt*0.22; if(t>=WT0+WC) t-=WC; this.setT(t); requestAnimationFrame(tick); };
+    requestAnimationFrame(tick); }
+  stop(){ this.playing=false; const b=$('[data-w=play]',this.root); if(b) b.textContent='Play'; }
+  ecg(t){ return 0.15*g(t,-0.1,0.02)-0.08*g(t,-0.016,0.007)+1.0*g(t,0,0.008)-0.22*g(t,0.018,0.008)+0.3*g(t,0.235,0.035)+0.15*g(t,0.7,0.02); }
+  snd(t){ const env=g(t,0.035,0.014)+0.8*g(t,0.322,0.011); return env*Math.sin(t*2*Math.PI*90); }
+  draw(){
+    const cv=this.cv, W=cv.parentElement.clientWidth; if(!W) return;
+    const narrow=W<600;
+    const rows=[['hdr',30],['press',narrow?150:180],['vol',narrow?52:60],['ecg',narrow?52:60],['snd',28],['sep',26],['art',narrow?56:64],['cvp',narrow?56:62],['pl',narrow?48:54]];
+    const R={}; let y=0; rows.forEach(([k,h])=>{ R[k]={y,h}; y+=h; }); const H=y+6;
+    const dpr=window.devicePixelRatio||1; cv.style.height=H+'px'; cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr);
+    const ctx=this.ctx; ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
+    const css=getComputedStyle(document.documentElement), C=n=>css.getPropertyValue(n).trim();
+    const gx=narrow?58:100, gw=W-gx-10; this.gx=gx; this.gw=gw;
+    const X=t=>gx+(t-WT0)/WC*gw;
+    const pi=this.phaseIndex(this.cur);
+    // bands
+    const band=(t0,t1,i)=>{ ctx.fillStyle= i===pi? C('--w-band1') : (i%2? C('--w-band2'):'transparent'); ctx.fillRect(X(t0),R.hdr.y,X(t1)-X(t0),H-R.hdr.y); };
+    PHASES.forEach((p,i)=>band(p.t0,p.t1,i)); band(WT0,-0.08,6);
+    // header numbers
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    PHASES.forEach((p,i)=>{ const cx=(X(p.t0)+X(p.t1))/2; ctx.beginPath(); ctx.arc(cx,15,10,0,7); ctx.fillStyle=i===pi?C('--orange'):C('--chip'); ctx.fill(); ctx.fillStyle=i===pi?C('--on-accent'):C('--ink'); ctx.font='700 12px '+C('--sans'); ctx.fillText(String(p.n),cx,15.5); });
+    // row labels
+    ctx.textAlign='left'; ctx.font=`700 ${narrow?10.5:12}px `+C('--sans');
+    const lab=(k,txt,col)=>{ ctx.fillStyle=col||C('--ink'); const r=R[k]; ctx.fillText(txt,4,r.y+r.h/2); };
+    lab('press','Pressure'); lab('vol','Volume'); lab('ecg','ECG'); lab('snd','Sounds');
+    lab('art',narrow?'ABP':'ABP (radial)',C('--w-art')); lab('cvp','CVP',C('--w-cvp')); lab('pl','Pleth',C('--w-pl'));
+    ctx.fillStyle=C('--orange'); ctx.font=`800 ${narrow?10.5:12}px `+C('--sans'); ctx.fillText(narrow?'BEDSIDE':'AT THE BEDSIDE',4,R.sep.y+R.sep.h/2+2);
+    ctx.strokeStyle=C('--w-axis'); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(gx,R.sep.y+R.sep.h/2+2); ctx.lineTo(W-10,R.sep.y+R.sep.h/2+2); ctx.stroke();
+    // axis ticks for pressure
+    ctx.font='10px '+C('--sans'); ctx.fillStyle=C('--muted'); ctx.textAlign='right';
+    const pY=v=>R.press.y+6+(1-v/110)*(R.press.h-12);
+    [0,50,100].forEach(v=>{ ctx.fillText(String(v),gx-4,pY(v)); ctx.strokeStyle=C('--w-axis'); ctx.setLineDash([2,4]); ctx.beginPath(); ctx.moveTo(gx,pY(v)); ctx.lineTo(W-10,pY(v)); ctx.stroke(); ctx.setLineDash([]); });
+    ctx.textAlign='left';
+    const plot=(fn,yf,col,w,dash)=>{ ctx.strokeStyle=col; ctx.lineWidth=w||2; ctx.setLineDash(dash||[]); ctx.beginPath(); for(let px=0;px<=gw;px++){ const t=WT0+px/gw*WC, yy=yf(fn(t)); px?ctx.lineTo(gx+px,yy):ctx.moveTo(gx,yy); } ctx.stroke(); ctx.setLineDash([]); };
+    const rowY=(k,min,max)=>v=>R[k].y+5+(1-(v-min)/(max-min))*(R[k].h-10);
+    // valve markers
+    [[0.02,'MC'],[0.07,'AO'],[0.31,'AC'],[0.38,'MO']].forEach(([t,l],i)=>{ ctx.strokeStyle=C('--muted'); ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(X(t),R.press.y); ctx.lineTo(X(t),R.snd.y+R.snd.h); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle=C('--muted'); ctx.font='700 10px '+C('--sans'); ctx.textAlign=i%2?'left':'right'; ctx.fillText(l,X(t)+(i%2?3:-3),R.press.y+9); });
+    ctx.textAlign='left';
+    plot(this.f.ao,pY,C('--w-ao'),2.2); plot(this.f.lv,pY,C('--w-lv'),2); plot(this.f.la,pY,C('--w-la'),2,[6,3]);
+    const vY=rowY('vol',40,105), eY=rowY('ecg',-0.35,1.1), sY=v=>R.snd.y+R.snd.h/2-v*(R.snd.h/2-3);
+    const aY=rowY('art',44,106), cY=rowY('cvp',1,8.5), lY=rowY('pl',0.1,1.08);
+    plot(this.f.vol,vY,C('--w-vol'),2); plot(t=>this.ecg(t),eY,C('--w-ecg'),1.8); plot(t=>this.snd(t),sY,C('--w-snd'),1);
+    plot(this.f.art,aY,C('--w-art'),2); plot(this.f.cvp,cY,C('--w-cvp'),2); plot(this.f.pl,lY,C('--w-pl'),2);
+    // annotations
+    const ann=(t,y,txt,col,al)=>{ ctx.fillStyle=col||C('--ink'); ctx.font='700 11px '+C('--sans'); ctx.textAlign=al||'center'; ctx.fillText(txt,X(t),y); };
+    if(!narrow){ ann(0.6,pY(this.f.ao(0.6))-9,'Aorta',C('--w-ao')); ann(0.04,pY(30),'LV ',C('--w-lv'),'right'); ann(0.6,pY(this.f.la(0.6))-10,'LA',C('--w-la')); }
+    ann(-0.1,eY(0.15)-8,'P',C('--w-ecg')); ann(0.035,eY(0.85),'QRS',C('--w-ecg'),'left'); ann(0.235,eY(0.3)-8,'T',C('--w-ecg'));
+    ann(0.035,R.snd.y+4,'S1',C('--w-snd')); ann(0.322,R.snd.y+4,'S2',C('--w-snd'));
+    ann(0.375,aY(72)+10,'notch',C('--w-art')); ann(0.21,aY(100)-6,'peak',C('--w-art'));
+    [[-0.04,'a',-8],[0.04,'c',-8],[0.2,'x',10],[0.375,'v',-8],[0.46,'y',10]].forEach(([t,l,o])=>ann(t,cY(this.f.cvp(t))+o,l,C('--w-cvp')));
+    // cursor
+    const cx=X(this.cur); ctx.strokeStyle=C('--w-cursor'); ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(cx,R.hdr.y+28); ctx.lineTo(cx,H-2); ctx.stroke();
+    const dot=(y,col)=>{ ctx.fillStyle=col; ctx.beginPath(); ctx.arc(cx,y,3.6,0,7); ctx.fill(); };
+    dot(pY(this.f.ao(this.cur)),C('--w-ao')); dot(pY(this.f.lv(this.cur)),C('--w-lv')); dot(pY(this.f.la(this.cur)),C('--w-la'));
+    dot(vY(this.f.vol(this.cur)),C('--w-vol')); dot(eY(this.ecg(this.cur)),C('--w-ecg'));
+    dot(aY(this.f.art(this.cur)),C('--w-art')); dot(cY(this.f.cvp(this.cur)),C('--w-cvp')); dot(lY(this.f.pl(this.cur)),C('--w-pl'));
+    if(pi!==this.ph){ this.ph=pi; this.renderInfo(pi); }
+  }
+  renderInfo(i){
+    const p=PHASES[i];
+    $$('[data-ph]',this.root).forEach(c=>c.setAttribute('aria-pressed',+c.dataset.ph===i));
+    this.info.innerHTML=`<div class="kicker">Phase ${p.n} of 7</div><h3>${p.name}</h3><div class="valves">${p.valves}</div><p style="margin:8px 0 0">${p.mech}</p>
+     <dl><dt style="color:var(--w-ecg)">ECG</dt><dd>${p.ecg}</dd><dt style="color:var(--w-art)">ABP</dt><dd>${p.art}</dd><dt style="color:var(--w-cvp)">CVP</dt><dd>${p.cvp}</dd><dt style="color:var(--w-pl)">Pleth</dt><dd>${p.pleth}</dd></dl>
+     <p class="note">EtCO₂ follows the breath, not the heartbeat: see the capnography lessons.</p>`;
+  }
+}
+
+/* =================== shared helpers =================== */
+const sim=new Sim();
+const app=$('#app');
+$$('.toolnav a').forEach(a=>{ if(a.dataset.v===VARIANT) a.setAttribute('aria-current','page'); });
+document.title='CICU Waveform Lab: '+({teach:'Teach',learn:'Learn',assess:'Knowledge Assessment'}[VARIANT]||'Teach');
+const LETTERS='ABCD';
+function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+// renders a multiple-choice question into el; q={s,o,a,w}; cb(correct, chosenOriginalIndex)
+function renderMCQ(el,q,cb,prior){
+  const order=prior&&prior.order? prior.order : shuffle(q.o.map((_,i)=>i));
+  el.innerHTML=`<p class="stem">${q.s}</p><div class="opts">${order.map((oi,k)=>`<button type="button" class="opt" data-oi="${oi}"><span class="ltr">${LETTERS[k]}</span><span>${q.o[oi]}</span></button>`).join('')}</div><div class="fbh"></div>`;
+  const show=(chosen)=>{
+    $$('.opt',el).forEach(b=>{ b.disabled=true; const oi=+b.dataset.oi; if(oi===q.a) b.classList.add('right'); else if(oi===chosen) b.classList.add('wrong'); });
+    const ok=chosen===q.a;
+    $('.fbh',el).innerHTML=`<div class="fb${ok?'':' no'}" role="status"><b>${ok?'Correct.':'Not quite.'}</b> ${q.w}</div>`;
+  };
+  if(prior && prior.chosen!=null){ show(prior.chosen); return order; }
+  $$('.opt',el).forEach(b=>b.addEventListener('click',()=>{ const c=+b.dataset.oi; show(c); cb && cb(c===q.a,c,order); }));
+  return order;
+}
+function sw(k){ return `<span class="sw" style="background:${COL[k]}"></span>`; }
+
+/* =================== TEACH =================== */
+const CTRLS=[
+ {sec:'Rhythm', open:true, items:[
+  {k:'rhythm',type:'select',label:'Rhythm',opts:[['sinus','Sinus rhythm'],['pvc','Sinus with PVCs'],['jet','Junctional ectopic tachycardia'],['chb','Complete heart block'],['flutter','Atrial flutter 2:1'],['afib','Atrial fibrillation'],['vf','Ventricular fibrillation']]},
+  {k:'hr',type:'range',label:'Ventricular rate',min:40,max:230,step:1,unit:' bpm'},
+  {k:'atrialRate',type:'range',label:'Atrial rate (JET / heart block)',min:60,max:220,step:1,unit:' bpm',when:P=>P.rhythm==='jet'||P.rhythm==='chb'},
+  {k:'cpr',type:'check',label:'CPR compressions',when:P=>P.rhythm==='vf'}]},
+ {sec:'Arterial line', open:true, items:[
+  {k:'sys',type:'range',label:'True systolic',min:30,max:160,step:1,unit:' mmHg'},
+  {k:'dia',type:'range',label:'True diastolic',min:10,max:110,step:1,unit:' mmHg'},
+  {k:'runoff',type:'range',label:'Diastolic runoff',min:1,max:3,step:0.1,fmt:v=>v<1.3?'Normal':v<2?'Moderate':'Marked'},
+  {k:'damping',type:'select',label:'Line damping',opts:[['optimal','Optimal'],['over','Overdamped'],['under','Underdamped (ringing)']]},
+  {type:'buttons',items:[['flush','Fast flush'],['zero','Zero ABP']]}]},
+ {sec:'CVP', items:[
+  {k:'cvp',type:'range',label:'Mean CVP',min:0,max:25,step:1,unit:' mmHg'},
+  {k:'cvPattern',type:'select',label:'CVP pattern',opts:[['normal','Normal a-c-x-v-y'],['tr','Large cv wave (TR)'],['tamponade','Blunted y descent (tamponade)'],['restrictive','Steep y descent (restrictive)'],['fontan','Fontan pathway (low-amplitude)']]}]},
+ {sec:'SpO₂ & perfusion', items:[
+  {k:'spo2',type:'range',label:'SpO₂',min:50,max:100,step:1,unit:'%'},
+  {k:'perf',type:'range',label:'Peripheral perfusion (pleth size)',min:0.1,max:1.5,step:0.05,fmt:v=>(v*1.6).toFixed(1)},
+  {k:'motion',type:'check',label:'Motion artifact'}]},
+ {sec:'Ventilation & CO₂', items:[
+  {k:'vent',type:'select',label:'Breathing',opts:[['ppv','Positive-pressure ventilation'],['spont','Spontaneous breathing']]},
+  {k:'rr',type:'range',label:'Respiratory rate',min:8,max:60,step:1,unit:' /min'},
+  {k:'etco2',type:'range',label:'EtCO₂',min:0,max:90,step:1,unit:' mmHg'},
+  {k:'capno',type:'select',label:'Capnogram shape',opts:[['normal','Normal'],['obstructive','Obstructive (shark fin)'],['rebreath','Rebreathing (raised baseline)'],['cleft','Curare cleft (spontaneous effort)'],['flat','Flat (no exhaled CO₂)']]},
+  {k:'swing',type:'range',label:'Intrathoracic pressure swing',min:0,max:8,step:0.5,unit:' mmHg'},
+  {k:'ppv',type:'range',label:'Stroke-volume variation with breathing',min:0,max:0.4,step:0.01,fmt:v=>Math.round(v*100)+'%'}]},
+];
+function buildTeach(){
+  app.innerHTML=`<div class="stack">
+   <section class="card scn-bar"><label for="scn">Scenario</label><select id="scn">${SCN_ORDER.map(k=>`<option value="${k}">${SCN[k].name}</option>`).join('')}</select><div class="scn-meta" id="scnMeta"></div><span class="sp"></span><button type="button" class="btn sec" id="reload">Restart scenario</button></section>
+   <div class="two"><div><div id="monHost"></div><p class="mon-foot">Sweep 25 mm/s for ECG and pressures, 6.25 mm/s for CO₂. Turn on <b>Labels</b> to name each wave as it is drawn; <b>Freeze</b> to hold the screen.</p></div>
+    <aside class="card ctl-panel sticky" id="ctl" aria-label="Instructor controls"><h2>Instructor controls</h2><p class="muted" style="margin:0;font-size:13.5px">Change the physiology live. Scenarios reset these.</p><div id="ctlBody"></div></aside></div>
+   <section class="card points" id="points"></section>
+   ${WIG_HTML}</div>`;
+  const mon=new Monitor($('#monHost'),sim,{labels:false});
+  new Wiggers($('.wig'));
+  const body=$('#ctlBody');
+  body.innerHTML=CTRLS.map((s,si)=>`<details${s.open?' open':''}><summary>${s.sec}</summary>${s.items.map((c,ci)=>{
+    const id=`c_${si}_${ci}`;
+    if(c.type==='buttons') return `<div class="row" style="margin:8px 0">${c.items.map(([k,l])=>`<button type="button" class="btn sec" data-act="${k}">${l}</button>`).join('')}</div>`;
+    if(c.type==='select') return `<div class="ctl" data-k="${c.k}"><label for="${id}">${c.label}</label><select id="${id}">${c.opts.map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></div>`;
+    if(c.type==='check') return `<div class="ctl chk" data-k="${c.k}"><label for="${id}"><input type="checkbox" id="${id}"> ${c.label}</label></div>`;
+    return `<div class="ctl" data-k="${c.k}"><label for="${id}"><span>${c.label}</span><output></output></label><input type="range" id="${id}" min="${c.min}" max="${c.max}" step="${c.step}"></div>`;
+  }).join('')}</details>`).join('');
+  const defs={}; CTRLS.forEach(s=>s.items.forEach(c=>{ if(c.k) defs[c.k]=c; }));
+  const fmt=(c,v)=>c.fmt? c.fmt(v) : (c.step<1? (+v).toFixed(1) : Math.round(v))+(c.unit||'');
+  const sync=(force)=>{
+    $$('.ctl',body).forEach(w=>{
+      const c=defs[w.dataset.k], inp=$('input,select',w), v=sim.P[c.k];
+      if(!force && document.activeElement===inp) return;
+      if(c.type==='check') inp.checked=!!v; else inp.value=v;
+      const o=$('output',w); if(o) o.textContent=fmt(c,v);
+      const on=!c.when||c.when(sim.P); w.classList.toggle('dis',!on); inp.disabled=!on;
+    });
+  };
+  body.addEventListener('input',e=>{
+    const w=e.target.closest('.ctl'); if(!w) return; const c=defs[w.dataset.k];
+    let v= c.type==='check'? (e.target.checked?1:0) : c.type==='range'? +e.target.value : e.target.value;
+    if(c.k==='dia') v=Math.min(v,sim.P.sys-6);
+    if(c.k==='sys') { v=Math.max(v,sim.P.dia+6); }
+    sim.set(c.k,v);
+    if(c.k==='rhythm' && v==='vf' && !sim.P.cpr) sim.set('cpr',1);
+    if(['sys','etco2','cvp'].includes(c.k)) mon.rescale();
+    sync(true);
+  });
+  body.addEventListener('click',e=>{ const b=e.target.closest('[data-act]'); if(!b) return; b.dataset.act==='flush'?sim.flush():sim.zero(); });
+  const load=id=>{
+    const s=SCN[id]; sim.load(s); mon.rescale();
+    $('#scnMeta').innerHTML=`<b>${esc(sim.P.patient)}</b> · ${esc(sim.P.dx)}`;
+    $('#points').innerHTML=`<div class="kicker">Teaching points</div><h2>${esc(s.name)}</h2><ul>${s.pts.map(p=>`<li>${p}</li>`).join('')}</ul>`;
+    sync(true); store.set('wl.teach.scn',id);
+  };
+  sim.onChange=()=>{ mon.rescale(); sync(false); };
+  setInterval(()=>sync(false),1000);
+  $('#scn').addEventListener('change',e=>load(e.target.value));
+  $('#reload').addEventListener('click',()=>load($('#scn').value));
+  const first=store.get('wl.teach.scn','baseline'); $('#scn').value=SCN[first]?first:'baseline'; load($('#scn').value);
+}
+
+/* =================== LEARN content =================== */
+const MODS=[
+ {id:'monitor', title:'Reading the monitor', steps:[
+  {t:'Find your way around', scn:'baseline', h:`<p>This layout follows a Philips IntelliVue–style bedside monitor. Each waveform on the left has a numeric box on the right in the <b>same color</b>:</p>
+   <ul><li>${sw('ecg')}<b>Green</b>: ECG lead II and heart rate</li><li>${sw('abp')}<b>Red</b>: arterial blood pressure (ABP)</li><li>${sw('cvp')}<b>Blue</b>: central venous pressure (CVP)</li><li>${sw('pleth')}<b>Cyan</b>: pleth and SpO₂</li><li>${sw('co2')}<b>Yellow</b>: capnogram and EtCO₂</li></ul>
+   <p>Each wave is drawn by a sweep moving left to right that erases just ahead of itself. ECG and pressures sweep at 25 mm/s (about 4–5 seconds across, so infant beats are readable). The capnogram sweeps four times slower so several breaths fit on screen.</p>`},
+  {t:'Numbers versus waves', scn:'pvc', h:`<p>The numbers are averages over several beats or one breath. ABP shows <b>systolic/diastolic</b> with the <b>mean in parentheses</b>. CVP is shown as a mean.</p>
+   <p><b>HR</b> is counted from the ECG. <b>Pulse</b> (in the SpO₂ box) is counted from the pleth. They should match. When they don’t, some electrical beats may not be producing a pulse.</p>
+   <p>The small numbers under each label are the alarm limits. A value outside them makes its box flash and puts a message in the top bar: <b>***</b> red is high priority, <b>**</b> yellow is medium, and cyan is a technical (INOP) message.</p>`,
+   q:{s:'This patient’s HR box reads higher than the Pulse in the SpO₂ box. What is the best interpretation?',o:['Some ECG beats are not producing a detectable peripheral pulse; compare the waveforms','The pulse oximeter is broken and should be replaced','Everything is normal; the two numbers are calculated the same way','The arterial line is overdamped'],a:0,
+    w:'HR comes from the ECG and Pulse from the pleth. A gap means some beats (here, PVCs that arrive before the ventricle has filled) generate little stroke volume, or one counter is wrong (tall T waves double-counted, pleth artifact). Look at the waveforms together.'}},
+  {t:'Tools on the bottom bar', scn:'baseline', labels:true, h:`<p><b>Labels</b> names each part of the waveform as it is drawn. <b>Freeze</b> holds the screen so you can study a beat. <b>Fast flush</b> and <b>Zero ABP</b> test the arterial line (covered in the line-fidelity module). Try them now.</p>
+   <p>A bedside routine for any waveform:</p><ol style="margin:6px 0;padding-left:20px"><li>Is the signal real?</li><li>What is the rhythm?</li><li>Is it perfusing?</li><li>Do the waves agree with each other and with the patient?</li><li>What is the trend?</li></ol>`,
+   q:{s:'What is the first question to ask about any new or alarming waveform?',o:['Is the signal real: good quality and correctly set up?','Which medication should I start?','Is the number inside the alarm limits?','What was the value on the last shift?'],a:0,
+    w:'Artifact, damping, leveling and probe problems are common. Treating an artifact can harm the patient, and dismissing a real change as “the line is always weird” can too. Confirm the signal, then interpret it.'}}
+ ]},
+ {id:'cycle', title:'The cardiac cycle (Wiggers)', steps:[
+  {t:'One heartbeat, many signals', scn:'baseline', labels:true, wig:2, h:`<p>The <b>Wiggers diagram</b> below lines up left-heart pressures, ventricular volume, the ECG and heart sounds across one heartbeat. We added the three bedside signals underneath it so you can see where each part of the monitor waveform comes from.</p>
+   <p>Electrical events (ECG) come first, mechanical events follow, and peripheral signals arrive later still because the pulse has to travel: arterial line first, pleth after it.</p><p>Drag the cursor across the diagram, or press <b>Play</b>.</p>`},
+  {t:'Phase 1 · Atrial systole', scn:'baseline', labels:true, wig:0, h:`<p>The P wave triggers atrial contraction. Ventricular volume gets a final boost: the <b>atrial kick</b>.</p><p><b>At the bedside:</b> the CVP <b>a wave</b> follows the P wave. The arterial line is at its <b>end-diastolic</b> low point.</p>`,
+   q:{s:'Which CVP wave follows the P wave on the ECG?',o:['a wave','c wave','v wave','y descent'],a:0,w:'Atrial depolarization (P) is followed by atrial contraction, which raises atrial pressure: the a wave. It sits in the PR interval, just before the QRS.'}},
+  {t:'Phase 2 · Isovolumic contraction', scn:'baseline', labels:true, wig:1, h:`<p>The QRS starts ventricular contraction. As soon as ventricular pressure exceeds atrial pressure the AV valves close (S1). With all four valves closed, pressure rises steeply while volume stays the same.</p><p><b>At the bedside:</b> the CVP <b>c wave</b> as the tricuspid valve bulges back. The arterial line has <b>not risen yet</b>.</p>`,
+   q:{s:'During isovolumic contraction, what is the arterial line showing?',o:['Its diastolic low point: the aortic valve has not opened yet','The systolic upstroke','The dicrotic notch','The systolic peak'],a:0,w:'Until ventricular pressure exceeds aortic pressure, nothing is ejected. The upstroke follows after the aortic valve opens, plus a short travel time to the catheter tip.'}},
+  {t:'Phases 3–4 · Ejection', scn:'baseline', labels:true, wig:2, h:`<p>When LV pressure exceeds aortic pressure, the aortic valve opens. <b>Rapid ejection</b> produces the arterial upstroke. <b>Reduced ejection</b> follows as pressures fall together, during the T wave.</p><p><b>At the bedside:</b> arterial <b>upstroke and peak</b>; CVP <b>x descent</b> (atrial relaxation plus the tricuspid annulus moving toward the apex); then atrial filling builds toward the <b>v wave</b>.</p>`,
+   q:{s:'Which CVP feature occurs during ventricular ejection?',o:['x descent','a wave','y descent','The rise toward the next a wave'],a:0,w:'The x descent happens in systole. The y descent comes later, in early diastole, after the tricuspid valve opens.'}},
+  {t:'Phase 5 · Isovolumic relaxation', scn:'baseline', labels:true, wig:4, h:`<p>The aortic and pulmonary valves close (S2) at about the end of the T wave. The <b>dicrotic notch</b> (incisura) on the arterial trace marks aortic valve closure.</p><p><b>At the bedside:</b> the notch, then the start of diastolic runoff. The CVP <b>v wave</b> peaks just before the tricuspid valve opens.</p>`,
+   q:{s:'The dicrotic notch on the arterial waveform marks which event?',o:['Aortic valve closure','Aortic valve opening','Mitral valve closure','Atrial contraction'],a:0,w:'The incisura is aortic valve closure at the end of ejection. On peripheral lines it is later, lower and shaped by reflected pressure waves, so the radial “dicrotic notch” is a timing marker for end-systole rather than an exact replica of the central event.'}},
+  {t:'Phase 6 · Rapid filling', scn:'baseline', labels:true, wig:5, h:`<p>The AV valves open and the ventricles fill rapidly.</p><p><b>At the bedside:</b> CVP <b>y descent</b>; arterial <b>diastolic runoff</b>.</p>`,
+   q:{s:'A blunted or absent y descent on the CVP suggests:',o:['Impaired early ventricular filling, as in tamponade','Tricuspid regurgitation','AV dissociation','Normal physiology'],a:0,w:'In tamponade, pericardial pressure limits filling throughout diastole, so the atrium cannot empty quickly and the y descent is lost. In constrictive or restrictive physiology the y descent is often steep: rapid early filling that stops abruptly.'}},
+  {t:'Phase 7 · Diastasis and heart rate', scn:'jet', labels:false, wig:6, h:`<p>Slow filling continues until the next P wave.</p><p><b>Heart rate matters.</b> As rate rises, systole shortens a little but diastole shortens a lot, and diastasis is lost first. At infant rates (120–160 bpm) the cycle is about half the length drawn here. In JET (on the monitor now, ~190 bpm) diastole is very short and the atrial kick is lost, so stroke volume falls.</p>`,
+   q:{s:'As heart rate rises from 120 to 190 bpm, which part of the cycle shortens the most?',o:['Diastole, especially diastasis','Isovolumic contraction','Ejection','All phases shorten equally'],a:0,w:'Systolic time is relatively fixed. Diastolic filling time (and coronary perfusion time) is what gets squeezed, which is why tachycardia, and JET in particular, can drop cardiac output after surgery.'}},
+  {t:'Putting timing together at the bedside', scn:'baseline', labels:true, wig:2, h:`<p>Use one beat on the live monitor and move down the screen: <b>P → a wave → QRS → c wave → arterial upstroke → pleth upstroke → T → notch and v wave → y descent</b>.</p><p>Press <b>Freeze</b> to hold a beat on screen and compare it with the diagram.</p>`,
+   q:{s:'After the QRS, which comes first?',o:['The arterial upstroke, then the pleth upstroke','The pleth upstroke, then the arterial upstroke','They occur at exactly the same time','The pleth upstroke comes before the QRS'],a:0,w:'The pleth is an optical volume signal from a distal site (finger, toe or ear) and typically lags the arterial line. The delay grows with vasoconstriction and low cardiac output.'}}
+ ]},
+ {id:'ecg', title:'ECG', steps:[
+  {t:'Lead II basics', scn:'baseline', labels:true, h:`<p>Lead II looks along the heart’s usual electrical axis, so P waves are usually upright and easy to see. That is why it is the default monitoring lead.</p>
+   <ul><li><b>P</b>: atrial depolarization</li><li><b>PR interval</b>: AV node delay</li><li><b>QRS</b>: ventricular depolarization (narrow with normal conduction; about 80 ms or less in infants)</li><li><b>ST/T</b>: ventricular repolarization</li></ul><p>Infants have faster rates and shorter intervals than older children and adults.</p>`,
+   q:{s:'What does the P wave represent?',o:['Atrial depolarization','Ventricular depolarization','Ventricular repolarization','AV node conduction'],a:0,w:'The P wave is atrial depolarization. The PR interval reflects AV conduction, the QRS ventricular depolarization, and the T wave ventricular repolarization.'}},
+  {t:'Junctional ectopic tachycardia', scn:'jet', labels:true, h:`<p>JET is a narrow-complex tachycardia from the AV junction, faster than the sinus rate. P waves march through at their own slower rate, unrelated to the QRS (<b>AV dissociation</b>), or may be retrograde.</p><p>It is most common in the first 24–72 hours after surgery near the AV node (TOF, VSD, AVSD repair). Watch the CVP for <b>cannon a waves</b> and the arterial pressure for a narrowing pulse pressure.</p>`,
+   q:{s:'POD 0 after TOF repair: HR 190, narrow QRS, P waves at ~135 not related to the QRS, intermittent tall CVP waves. Most likely rhythm?',o:['Junctional ectopic tachycardia','Sinus tachycardia','Atrial flutter with 2:1 conduction','Complete heart block'],a:0,w:'Narrow QRS faster than and dissociated from the atrial rate, early after surgery near the AV node, is JET. The tall CVP waves are cannon a waves from atrial contraction against a closed tricuspid valve.'}},
+  {t:'Complete heart block', scn:'chb', labels:true, h:`<p>The atria and ventricles beat independently. P waves are faster than the QRS rate, with no consistent PR interval. The escape rhythm may be junctional (narrow) or ventricular (wide, as here).</p><p>Post-operative heart block is a known risk after VSD, AVSD and some other repairs. Check epicardial wires and be ready to pace.</p>`,
+   q:{s:'In complete heart block, what is the relationship between P waves and QRS complexes?',o:['None: atria and ventricles beat independently, with the atrial rate usually faster','Every P wave conducts after a long PR interval','Every other P wave conducts','The PR interval lengthens until a beat is dropped'],a:0,w:'Complete (third-degree) AV block means no conduction. The other options describe first-degree block, 2:1 block and Mobitz I (Wenckebach).'}},
+  {t:'Atrial flutter', scn:'flutter', h:`<p>Flutter waves (sawtooth in lead II) replace P waves, and the ventricular rate is often a fixed fraction of the atrial rate (here 2:1). The rhythm is regular.</p><p>Intra-atrial reentry and flutter are common after atrial surgery and Fontan, and are poorly tolerated in Fontan physiology.</p>`,
+   q:{s:'Why is there no a wave on the venous tracing in atrial flutter?',o:['There is no organized atrial contraction; flutter waves replace it','The tricuspid valve is regurgitant','The transducer is overdamped','The a wave is hidden inside the v wave'],a:0,w:'Without organized atrial systole there is no a wave, only small flutter ripples. Losing the atrial kick reduces ventricular filling, which matters in stiff ventricles and Fontan physiology.'}},
+  {t:'Premature ventricular contractions', scn:'pvc', labels:true, h:`<p>A PVC is a wide, premature QRS without a preceding P wave, usually followed by a compensatory pause.</p><p>Watch the arterial and pleth traces: the PVC arrives before the ventricle has filled, so its pulse is small. The next sinus beat is bigger.</p>`,
+   q:{s:'After a PVC, why is the next normal beat’s arterial pulse larger?',o:['The compensatory pause allows extra filling, and contractility is briefly potentiated','The PVC added extra blood to the aorta','The arterial line is ringing','Atrial contraction was lost'],a:0,w:'Longer filling time increases preload, and post-extrasystolic potentiation briefly increases contractility. Both enlarge the following pulse.'}}
+ ]},
+ {id:'art', title:'Arterial line', steps:[
+  {t:'Anatomy of the arterial pulse', scn:'baseline', labels:true, wig:3, h:`<ul><li><b>Upstroke</b>: ventricular ejection</li><li><b>Systolic peak</b></li><li><b>Dicrotic limb and notch</b>: end of ejection and aortic valve closure</li><li><b>Diastolic runoff</b>: flow out to the periphery</li><li><b>End-diastole</b>: the lowest point, just before the next upstroke</li></ul><p>The monitor calculates <b>MAP</b> by averaging the whole waveform, not with a formula.</p>`,
+   q:{s:'How does the monitor determine MAP from an arterial line?',o:['It averages (integrates) the pressure over the whole cardiac cycle','It calculates (SBP + 2 × DBP) / 3','It takes the midpoint of systolic and diastolic','It reads the pressure at the dicrotic notch'],a:0,w:'The monitor integrates the waveform. The (SBP + 2 × DBP)/3 estimate assumes diastole is about two-thirds of the cycle; at fast infant heart rates systole takes up more of the cycle, so the formula tends to underestimate the true mean.'}},
+  {t:'Peripheral amplification', scn:'baseline', labels:true, h:`<p>As the pulse travels away from the heart, reflected waves add to it: <b>systolic rises</b>, diastolic falls slightly, and the notch moves later and lower. <b>MAP stays nearly constant.</b></p><p>So radial, femoral and umbilical systolic pressures can differ while MAP agrees. After bypass, or with intense vasoconstriction, peripheral pressures can also under-read central pressure, so compare sites when the picture does not fit.</p>`,
+   q:{s:'As the pulse travels from the aorta to the radial artery, which value stays most constant?',o:['Mean arterial pressure','Systolic pressure','Pulse pressure','The timing of the dicrotic notch'],a:0,w:'Wave reflection amplifies systolic and pulse pressure peripherally while MAP falls only slightly. That is one reason MAP is the preferred value for titration.'}},
+  {t:'Pulse pressure', scn:'bt', labels:true, h:`<p><b>Wide pulse pressure with a low diastolic:</b> diastolic runoff (systemic-to-pulmonary shunt, large PDA, aortopulmonary collaterals, aortic insufficiency) or vasodilation.</p><p><b>Narrow pulse pressure:</b> low stroke volume (low cardiac output, tamponade, hypovolemia), or an overdamped line.</p><p>On the monitor: a Norwood with a BT shunt. Look at how steeply pressure falls after the notch.</p>`,
+   q:{s:'In this Norwood/BT-shunt neonate, what best explains the low diastolic pressure?',o:['Blood runs off through the shunt into the pulmonary circulation during diastole','The arterial line is overdamped','Aortic stenosis','Severe hypovolemia'],a:0,w:'A systemic-to-pulmonary shunt flows throughout the cycle, so aortic pressure falls quickly in diastole. Low diastolic pressure can compromise coronary perfusion. Trend it with SpO₂, lactate and other perfusion markers.'}},
+  {t:'Respiratory variation', scn:'hypovol', labels:false, h:`<p>Under positive-pressure ventilation, each breath changes venous return and ventricular loading, so arterial pulse pressure rises and falls with the ventilator (systolic and pulse-pressure variation).</p><p>Large variation suggests the heart is on the steep part of the Frank–Starling curve, but only when conditions are met: regular rhythm, controlled ventilation, closed chest, no spontaneous breaths. Evidence in children is weaker than in adults, and RV dysfunction or congenital physiology can confound it.</p>`,
+   q:{s:'Which situation makes pulse-pressure variation unreliable as a guide to preload responsiveness?',o:['Irregular rhythm or spontaneous breathing efforts','Controlled positive-pressure ventilation','A closed chest','Regular sinus rhythm'],a:0,w:'Arrhythmias and spontaneous efforts create variation unrelated to preload. Open chest, very low tidal volumes and RV dysfunction also limit interpretation.'}}
+ ]},
+ {id:'fid', title:'Arterial line fidelity', steps:[
+  {t:'The line is a system', scn:'baseline', act:['flush'], h:`<p>Catheter, tubing, stopcocks and transducer form a fluid-filled system with its own <b>natural frequency</b> and <b>damping</b>. Fast heart rates (infants!) put more of the signal near the natural frequency, so ringing is common.</p>
+   <p><b>Fast-flush (square-wave) test:</b> pull the flush, release, and look at what follows. Optimally damped: a sharp drop with about <b>1–2 oscillations</b>, then the waveform returns.</p><p>Press <b>Fast flush</b>.</p>`,
+   q:{s:'After a fast flush, you see 1–2 oscillations before the waveform resumes. This means the system is:',o:['Optimally damped','Overdamped','Underdamped','In need of re-zeroing'],a:0,w:'One to two oscillations followed by a crisp return is the optimal response. No oscillation with a slow return means overdamping; many oscillations mean underdamping.'}},
+  {t:'Overdamped', scn:'overdamped', act:['flush'], h:`<p>The upstroke is slurred and rounded and the notch is lost. The fast flush returns slowly with no oscillation.</p><p><b>Causes:</b> air bubbles, clot at the catheter tip, kinked or compliant tubing, loose connections, a catheter against the vessel wall, an under-inflated pressure bag.</p>`,
+   q:{s:'How does overdamping change the displayed values?',o:['Systolic falsely low, diastolic falsely high, MAP relatively preserved','Systolic falsely high, diastolic falsely low','All values falsely high','Only the heart rate changes'],a:0,w:'Overdamping smooths the waveform, cutting off the peak and filling in the trough. MAP is least affected, but do not trust any number until the system is fixed.'}},
+  {t:'Underdamped', scn:'underdamped', act:['flush'], h:`<p>A tall, narrow systolic spike with ringing. The fast flush shows several oscillations.</p><p><b>Causes:</b> long or stiff tubing, extra stopcocks and extensions, fast heart rates, a hyperdynamic circulation. Small air bubbles can make ringing worse.</p>`,
+   q:{s:'Which change is most likely to reduce ringing?',o:['Shorten the tubing and remove unneeded stopcocks and extensions','Add another extension set','Raise the heart rate','Re-zero the transducer'],a:0,w:'Shorter, stiffer, simpler tubing raises the natural frequency, moving it away from the frequencies in the pulse. A damping device can also help. Re-zeroing fixes offset, not resonance.'}},
+  {t:'Level and zero', scn:'baseline', act:['zero'], h:`<p><b>Zero</b>: open the transducer to air so atmospheric pressure reads 0. <b>Level</b>: keep the transducer’s air–fluid interface at the right atrium (phlebostatic axis: 4th intercostal space, mid-axillary line; mid-chest in infants). Re-level whenever bed height or patient position changes.</p>
+   <p>Every centimetre off level is about <b>0.74 mmHg</b>. A transducer too low reads falsely high; too high reads falsely low. This matters most for low pressures like CVP.</p><p>Press <b>Zero ABP</b> to see the zeroing sequence.</p>`,
+   q:{s:'The transducer is 10 cm above the right atrium. How does the CVP read?',o:['About 7 mmHg falsely low','About 7 mmHg falsely high','Unchanged','About 10 mmHg falsely high'],a:0,w:'10 cm × 0.74 mmHg/cm ≈ 7 mmHg. A transducer above the reference level reads low; below it reads high.'}}
+ ]},
+ {id:'cvp', title:'CVP', steps:[
+  {t:'a, c, x, v, y', scn:'baseline', labels:true, wig:0, h:`<ul><li><b>a</b>: atrial contraction, after the P wave</li><li><b>c</b>: tricuspid closure bulging back, just after the QRS</li><li><b>x descent</b>: atrial relaxation in systole</li><li><b>v</b>: atrial filling against a closed tricuspid valve, after the T wave</li><li><b>y descent</b>: tricuspid opening and atrial emptying</li></ul><p>At infant heart rates these waves crowd together. Use the ECG to time them.</p>`,
+   q:{s:'Which CVP component occurs after the T wave, as the atria fill against a closed tricuspid valve?',o:['v wave','a wave','c wave','x descent'],a:0,w:'The v wave builds during late systole and peaks around the end of the T wave, just before the tricuspid valve opens.'}},
+  {t:'Reading the number', scn:'baseline', labels:true, h:`<p>Read CVP at <b>end-expiration</b>, when intrathoracic pressure is closest to atmospheric. Under positive-pressure ventilation that is just before the breath raises pressure. With spontaneous breathing, it is just before inspiration pulls pressure down.</p>
+   <p>For a filling-pressure estimate, read the mean of the a wave (end-diastole). The monitor’s mean averages the whole breath and every wave, so it can mislead when a or v waves are large.</p><p>CVP alone does not predict fluid responsiveness. Trend it alongside everything else.</p>`,
+   q:{s:'When should CVP be read in a ventilated patient?',o:['At end-expiration','At peak inspiration','Whenever the number stops changing','Only when the patient is disconnected from the ventilator'],a:0,w:'End-expiration minimizes the effect of airway pressure on the measurement. Never disconnect a patient from the ventilator to read a CVP.'}},
+  {t:'Cannon a waves', scn:'chb', labels:true, h:`<p>When the atrium contracts against a <b>closed</b> tricuspid valve, pressure spikes: a cannon a wave.</p><p><b>Regular</b> cannon waves: junctional rhythm with retrograde P waves, or ventricular pacing. <b>Intermittent</b> cannon waves: AV dissociation (complete heart block, JET), PVCs.</p>`,
+   q:{s:'Which rhythm is LEAST likely to cause cannon a waves?',o:['Sinus rhythm with a normal PR interval','Complete heart block','Junctional ectopic tachycardia','Ventricular (VVI) pacing'],a:0,w:'With a normal PR interval, atrial contraction finishes before ventricular systole, so the tricuspid valve is open. The other three can all put atrial contraction inside ventricular systole.'}},
+  {t:'Large v (cv) waves', scn:'tr', labels:true, h:`<p>With tricuspid regurgitation, blood flows back into the right atrium during systole, producing a broad, tall <b>cv wave</b> that starts with the QRS and peaks after the T wave. The x descent disappears.</p><p>A noncompliant right atrium (e.g., after surgery) can also exaggerate the v wave.</p>`,
+   q:{s:'What is the classic CVP finding in significant tricuspid regurgitation?',o:['A large systolic cv wave with loss of the x descent','Cannon a waves','An absent y descent','A flat, nonpulsatile trace'],a:0,w:'Regurgitant flow during systole fills the RA, merging the c and v waves into one large systolic wave and replacing the x descent.'}},
+  {t:'Tamponade', scn:'tamponade', labels:true, h:`<p>Rising CVP, a narrowing pulse pressure, tachycardia and a <b>blunted y descent</b>. The pericardium limits filling throughout diastole, so the atrium cannot empty quickly when the tricuspid valve opens.</p>`,
+   q:{s:'Which CVP change best fits tamponade?',o:['Elevated CVP with a blunted or absent y descent','Low CVP with a prominent y descent','Large cv waves','Cannon a waves'],a:0,w:'Tamponade raises CVP and abolishes rapid early filling (y descent). A steep y descent with high CVP suggests constrictive or restrictive physiology instead.'}},
+  {t:'Fontan pressure', scn:'fontan', labels:true, h:`<p>After a Fontan there is no pump to the lungs. A catheter in the SVC/IJ measures the <b>Fontan pathway (pulmonary artery) pressure</b>: the pressure driving blood across the lungs.</p><p>The waveform is low-amplitude with large respiratory swings. The <b>transpulmonary gradient</b> is Fontan pressure minus common atrial pressure.</p>`,
+   q:{s:'After an extracardiac Fontan, what does the “CVP” from an IJ line represent?',o:['Fontan pathway / pulmonary artery pressure','Right ventricular end-diastolic pressure','Left atrial pressure','Pulmonary capillary wedge pressure'],a:0,w:'Systemic venous return goes straight to the pulmonary arteries, so this pressure is the driving pressure for pulmonary blood flow. Compare it with the common atrial pressure to get the transpulmonary gradient.'}}
+ ]},
+ {id:'spo2', title:'Pleth & SpO₂', steps:[
+  {t:'The pleth', scn:'baseline', labels:true, h:`<p>The pleth is an optical volume pulse from a finger, toe, hand, foot or ear. It lags the arterial line, and a good signal often shows a small notch.</p><p>Amplitude (and the perfusion index) reflects local perfusion and vascular tone. Many monitors <b>auto-scale</b> the pleth, so check your settings before comparing amplitude over time.</p>`,
+   q:{s:'Before trusting the SpO₂ number, what should you check?',o:['A clean pleth with a consistent shape that matches the heart rate','That the number is above 90%','That the alarm is on','The previous shift’s value'],a:0,w:'SpO₂ is only as good as the pleth. A regular, well-formed waveform whose rate matches the ECG is the best quick check of signal quality.'}},
+  {t:'Artifact', scn:'baseline', o:{motion:1}, h:`<p>Motion, poor probe position, ambient light and low perfusion all corrupt the signal. The monitor may show <b>-?-</b> or a technical message.</p><p>Here the ECG and arterial line are clean, but the pleth is not.</p>`,
+   q:{s:'ECG and arterial line are clean, but the pleth is irregular and noisy and the SpO₂ jumps around. Most likely?',o:['Pleth artifact (motion or probe); check the patient, then the probe','Sudden severe hypoxemia','Ventricular fibrillation','Overdamped arterial line'],a:0,w:'When the other signals are stable and only the pleth is chaotic, artifact is likely. Still look at the patient first; never dismiss a real desaturation.'}},
+  {t:'Low perfusion and lag', scn:'lowco', labels:false, h:`<p>A small pleth and low perfusion index suggest a cold periphery: vasoconstriction, hypothermia, low cardiac output. SpO₂ may drop out.</p><p>SpO₂ changes appear late: the monitor averages over several seconds, and blood takes time to reach the probe. The delay is longer with low output and toe or foot probes.</p>`,
+   q:{s:'Why can a change in SpO₂ appear late after an event?',o:['Signal averaging plus circulation time to the probe site','The probe only measures once a minute','SpO₂ measures venous blood','Because EtCO₂ always changes first'],a:0,w:'Averaging and circulation delay both add lag, more so in low-output states and with distal probes. That is why EtCO₂ and the ECG often change first.'}},
+  {t:'Targets in single-ventricle physiology', scn:'bt', labels:false, h:`<p>In shunt-dependent mixing physiology (e.g., Norwood with a BT shunt), SpO₂ of about <b>75–85%</b> is often the target. It reflects the balance of pulmonary and systemic blood flow (Qp:Qs). Follow patient-specific limits.</p><p>Oximeter accuracy falls at low saturations and can overestimate saturation in patients with darker skin pigmentation. Confirm with blood gases when it matters.</p>`,
+   q:{s:'A shunt-dependent neonate has SpO₂ 95% with low blood pressure and rising lactate. What does this suggest?',o:['Pulmonary blood flow may be excessive at the expense of systemic flow (high Qp:Qs)','Ideal balance of circulations','Shunt occlusion','Probe artifact'],a:0,w:'High saturation in mixing physiology often means too much pulmonary flow and too little systemic flow, which fits low blood pressure and rising lactate.'}}
+ ]},
+ {id:'co2', title:'Capnography & EtCO₂', steps:[
+  {t:'Capnogram phases', scn:'baseline', labels:true, h:`<ul><li><b>Phase 0</b>: inspiration (downstroke to baseline)</li><li><b>Phase I</b>: dead-space gas, no CO₂</li><li><b>Phase II</b>: rapid rise as alveolar gas mixes in</li><li><b>Phase III</b>: alveolar plateau; EtCO₂ is the value at its end</li></ul><p>The angle between phases II and III (the α angle) widens with obstruction. In healthy lungs EtCO₂ is usually a few mmHg below PaCO₂.</p>`,
+   q:{s:'Which phase of the capnogram represents alveolar gas?',o:['Phase III','Phase I','Phase II','Phase 0'],a:0,w:'Phase III is the alveolar plateau. EtCO₂ is measured at its end.'}},
+  {t:'EtCO₂ tracks pulmonary blood flow', scn:'bt', h:`<p>CO₂ only reaches exhaled gas if blood carries it to ventilated alveoli. When pulmonary blood flow is limited (shunt-dependent or other lesions with reduced pulmonary flow, low cardiac output, PE, high airway pressure), dead space rises and the <b>EtCO₂–PaCO₂ gap widens</b>.</p><p>Know your patient’s gap from a blood gas, then trend EtCO₂.</p>`,
+   q:{s:'Why is EtCO₂ often much lower than PaCO₂ in a Norwood/BT-shunt patient?',o:['Limited pulmonary blood flow increases dead space (ventilated but under-perfused alveoli)','The capnograph is miscalibrated','The patient is hyperventilating','CO₂ crosses the shunt into the aorta'],a:0,w:'Alveoli that are ventilated but poorly perfused add CO₂-free gas to each breath, lowering EtCO₂ relative to arterial CO₂.'}},
+  {t:'Sudden loss of CO₂', scn:'ett', h:`<p>Watch the capnogram over the next 10 seconds.</p><p>A capnogram that suddenly goes <b>flat</b> while the heart is still beating means no CO₂ is reaching the sensor: displacement, disconnection or complete obstruction. SpO₂ lags; bradycardia is late.</p>`,
+   q:{s:'The capnogram suddenly goes flat. What should you check first?',o:['ETT position and the circuit (DOPE: Displacement, Obstruction, Pneumothorax, Equipment)','Arterial line damping','The pulse oximeter probe','The inotrope infusion rate'],a:0,w:'A flat capnogram with a perfusing rhythm is an airway or circuit problem until proven otherwise. Low cardiac output lowers EtCO₂ gradually; it does not drop it to zero.'}},
+  {t:'Sudden fall, normal shape', scn:'shunt', h:`<p>Watch for about 30 seconds. EtCO₂ drops abruptly but the capnogram keeps its shape. Then SpO₂ falls and diastolic pressure rises.</p><p>Same ventilation, less blood reaching the lungs. In a shunt-dependent patient this is <b>shunt occlusion</b> until proven otherwise.</p>`,
+   q:{s:'Shunt-dependent neonate: EtCO₂ falls from 29 to 12 with a normal-shaped capnogram, then SpO₂ falls. ETT is secure. Most likely?',o:['Acute shunt occlusion (thrombosis)','Bronchospasm','Unplanned extubation','Rebreathing'],a:0,w:'An abrupt fall in pulmonary blood flow lowers EtCO₂ while the waveform shape stays normal. Loss of diastolic runoff (higher diastolic, narrower pulse pressure) supports it. This is an emergency.'}},
+  {t:'Shark fin', scn:'bronch', labels:true, h:`<p>A slow phase II rise and a sloping phase III give the <b>shark-fin</b> shape. Alveoli empty unevenly: bronchospasm, a kinked or partially obstructed ETT, secretions.</p><p>Other shapes to know: a raised inspiratory baseline means <b>rebreathing</b>; a dip in the plateau (curare cleft) means spontaneous effort during a ventilator breath. Try them on the Teach page.</p>`,
+   q:{s:'What does a shark-fin capnogram suggest?',o:['Expiratory airflow obstruction (bronchospasm, kinked or obstructed ETT)','Rebreathing of CO₂','Low cardiac output','A normal capnogram'],a:0,w:'Obstruction slows alveolar emptying, so CO₂ rises gradually and the plateau slopes. Rebreathing raises the baseline instead.'}},
+  {t:'CPR and ROSC', scn:'vf', h:`<p>Watch for about 20 seconds. During CPR, EtCO₂ reflects the pulmonary blood flow generated by compressions; persistently very low values suggest poor CPR quality. With an arterial line, diastolic pressure during compressions is another quality marker.</p><p>An abrupt, sustained rise in EtCO₂ with an organized rhythm signals <b>return of spontaneous circulation</b>.</p>`,
+   q:{s:'During CPR, what change suggests ROSC?',o:['An abrupt, sustained rise in EtCO₂','A gradual fall in EtCO₂','A larger compression artifact on the ECG','A rising SpO₂ number on its own'],a:0,w:'When the heart starts pumping, pulmonary blood flow and EtCO₂ jump. Confirm with an organized rhythm and an arterial waveform that persists during a pause in compressions.'}}
+ ]},
+ {id:'all', title:'Putting it together', steps:[
+  {t:'Heart–lung interactions', scn:'hypovol', h:`<p>Positive-pressure breaths raise intrathoracic pressure: venous return falls, CVP rises during the breath, and left-sided stroke volume swings a few beats later. Spontaneous breaths do the opposite.</p><p>On the monitor: large pulse-pressure variation and a CVP of 3.</p>`,
+   q:{s:'Ventilated, closed chest, regular rhythm, no spontaneous breaths: large pulse-pressure swings and CVP 3. Best interpretation?',o:['May be preload responsive; confirm with the clinical picture and the response to a measured bolus','Fluid responsiveness is proven; bolus until the variation disappears','The arterial line is overdamped','Diagnostic of tamponade'],a:0,w:'It is a useful clue, not proof, especially in children. Look for supporting evidence (bleeding, low CVP, response to a measured bolus) and reassess.'}},
+  {t:'Tamponade, all channels', scn:'tamponade', h:`<p>Read every channel: <b>ECG</b> tachycardia; <b>ABP</b> low, narrow pulse pressure with exaggerated respiratory variation; <b>CVP</b> high with a blunted y descent; <b>EtCO₂</b> low as cardiac output falls; <b>SpO₂</b> may still look fine.</p>`,
+   q:{s:'Which combination most strongly suggests post-operative tamponade?',o:['Rising CVP, narrowing pulse pressure, tachycardia and falling chest-tube output','Low CVP, wide pulse pressure and bradycardia','Large cv wave with normal blood pressure','A shark-fin capnogram'],a:0,w:'Tamponade raises filling pressures while stroke volume falls. A sudden drop in chest-tube output can mean clot is collecting around the heart. Get a bedside echo and call the surgical team.'}},
+  {t:'Low cardiac output, all channels', scn:'lowco', h:`<p>Watch for a minute: pulse pressure narrows, the pleth shrinks, EtCO₂ drifts down with no change in ventilation, and CVP climbs.</p><p>No single number makes the diagnosis; the <b>pattern and the trend</b> do. Pair it with exam, lactate, NIRS and urine output.</p>`,
+   q:{s:'Which trend best supports falling cardiac output?',o:['Narrowing pulse pressure, smaller pleth and EtCO₂ falling while ventilation is unchanged','Wide pulse pressure with a low diastolic','A sudden flat capnogram','Ringing on the arterial trace'],a:0,w:'Each finding reflects less stroke volume or less pulmonary blood flow. Together and trending in the same direction, they are far more convincing than any one alone.'}},
+  {t:'Your bedside routine', scn:'baseline', labels:true, wig:2, h:`<ol style="padding-left:20px;margin:6px 0"><li><b>Is it real?</b> Signal quality, leveling, zeroing, damping, probe.</li><li><b>Rhythm.</b> P waves, QRS width, AV relationship.</li><li><b>Perfusion.</b> Arterial contour and pulse pressure, pleth, pulse versus HR.</li><li><b>Filling and the cardiac cycle.</b> CVP waves timed to the ECG.</li><li><b>Ventilation and pulmonary blood flow.</b> Capnogram shape and EtCO₂ trend.</li><li><b>Integrate and trend.</b> Patient, anatomy, surgery, labs.</li></ol>`,
+   q:{s:'Which finding should make you doubt an alarming number before acting on it?',o:['The waveform behind the number looks like artifact or is poorly damped','The number is outside the alarm limits','The number changed quickly','Another provider is worried'],a:0,w:'A number is only as good as its waveform. Quickly confirm signal quality (while assessing the patient), then act.'}}
+ ]}
+];
+
+/* =================== LEARN UI =================== */
+function buildLearn(){
+  let prog=store.get('wl.learn',{}); // {modId:{stepIdx:{v:1, c:chosen, order:[...]}}}
+  let mi=0, si=0;
+  const saved=store.get('wl.learn.pos',null); if(saved && MODS[saved.m]){ mi=saved.m; si=Math.min(saved.s,MODS[saved.m].steps.length-1); }
+  app.innerHTML=`<div class="stack">
+   <nav class="mods" id="mods" aria-label="Modules"></nav>
+   <div class="two wide-side"><div><div id="monHost"></div><p class="mon-foot">Use <b>Labels</b> and <b>Freeze</b> on the monitor’s bottom bar at any time.</p></div>
+    <article class="card step sticky" id="step" aria-live="polite"></article></div>
+   ${WIG_HTML}</div>`;
+  const mon=new Monitor($('#monHost'),sim,{labels:false});
+  const wig=new Wiggers($('.wig'));
+  sim.onChange=()=>mon.rescale();
+  let curScn=null;
+  const modDone=m=>{ const p=prog[m.id]||{}; return m.steps.filter((s,i)=>p[i]&&(p[i].v)&&(!s.q||p[i].c!=null)).length; };
+  const renderMods=()=>{
+    $('#mods').innerHTML=MODS.map((m,i)=>{ const d=modDone(m), n=m.steps.length; return `<button type="button" class="mod${d===n?' done':''}" data-m="${i}"${i===mi?' aria-current="step"':''}><b>${i+1}. ${m.title}</b><small>${d===n?'Complete':`${d} of ${n} steps`}</small></button>`; }).join('');
+  };
+  $('#mods').addEventListener('click',e=>{ const b=e.target.closest('[data-m]'); if(!b) return; mi=+b.dataset.m; si=0; render(true); });
+  const render=(scroll)=>{
+    const m=MODS[mi], st=m.steps[si];
+    const key=st.scn+JSON.stringify(st.o||{});
+    if(key!==curScn){ sim.load(SCN[st.scn], st.o); mon.rescale(); curScn=key; }
+    mon.setLabels(!!st.labels); mon.setFrozen(false);
+    if(st.wig!=null){ wig.stop(); wig.setPhase(st.wig); }
+    prog[m.id]=prog[m.id]||{}; const p=prog[m.id][si]=prog[m.id][si]||{}; p.v=1;
+    store.set('wl.learn',prog); store.set('wl.learn.pos',{m:mi,s:si});
+    const pct=Math.round((si+1)/m.steps.length*100);
+    const el=$('#step');
+    el.innerHTML=`<div class="kicker">Module ${mi+1} · Step ${si+1} of ${m.steps.length}</div><h2>${st.t}</h2><div class="prog" aria-hidden="true"><span style="width:${pct}%"></span></div>
+     <div class="body">${st.h}</div>
+     ${st.act?`<div class="row acts">${st.act.map(a=>`<button type="button" class="btn sec" data-a="${a}">${a==='flush'?'Fast flush':'Zero ABP'}</button>`).join('')}</div>`:''}
+     ${st.wig!=null?`<p class="muted" style="font-size:13px;margin:6px 0 0">The Wiggers diagram below is set to this phase.</p>`:''}
+     ${st.q?`<div class="q" id="q"></div>`:''}
+     <div class="nav"><button type="button" class="btn sec" id="prev"${mi===0&&si===0?' disabled':''}>← Back</button><span class="sp"></span><button type="button" class="btn" id="next">${si<m.steps.length-1?'Next →':mi<MODS.length-1?'Next module →':'Finish'}</button></div>`;
+    if(st.q){ const order=renderMCQ($('#q',el),st.q,(ok,c,ord)=>{ p.c=c; p.order=ord; store.set('wl.learn',prog); renderMods(); }, p.c!=null?{chosen:p.c,order:p.order}:null); if(!p.order){ p.order=order; } }
+    $$('[data-a]',el).forEach(b=>b.addEventListener('click',()=>b.dataset.a==='flush'?sim.flush():sim.zero()));
+    $('#prev',el).addEventListener('click',()=>{ if(si>0) si--; else if(mi>0){ mi--; si=MODS[mi].steps.length-1; } render(true); });
+    $('#next',el).addEventListener('click',()=>{ if(si<m.steps.length-1) si++; else if(mi<MODS.length-1){ mi++; si=0; } else { renderDone(); return; } render(true); });
+    renderMods();
+    if(scroll && window.innerWidth<1060) el.scrollIntoView({behavior:'smooth',block:'start'});
+  };
+  const renderDone=()=>{
+    const tot=MODS.reduce((a,m)=>a+m.steps.filter(s=>s.q).length,0);
+    let right=0; MODS.forEach(m=>m.steps.forEach((s,i)=>{ const p=(prog[m.id]||{})[i]; if(s.q&&p&&p.c===s.q.a) right++; }));
+    $('#step').innerHTML=`<div class="kicker">All modules</div><h2>You’ve worked through the Learn modules</h2><p>Practice questions answered correctly on the first try: <b>${right} of ${tot}</b>.</p><p>When you’re ready, try the <a href="assess.html">Knowledge Assessment</a>: case-based questions on a live monitor, with no labels.</p><div class="nav"><button type="button" class="btn sec" id="restart">Reset my Learn progress</button></div>`;
+    $('#restart').addEventListener('click',()=>{ prog={}; store.set('wl.learn',prog); mi=0; si=0; render(true); });
+  };
+  render(false);
+}
+
+/* =================== ASSESSMENT =================== */
+const AQ=[
+ {scn:'baseline', topic:'CVP', s:'Look at the CVP and the ECG. Which venous wave occurs just after each P wave, before the QRS?', o:['a wave: atrial contraction','c wave: tricuspid valve bulging back','v wave: atrial filling against a closed tricuspid valve','y descent: tricuspid valve opening'], a:0, w:'The a wave follows atrial depolarization and contraction, so it sits in the PR interval. The c wave comes just after the QRS and the v wave after the T wave.'},
+ {scn:'baseline', topic:'Cardiac cycle', s:'On the arterial trace, the dicrotic notch lines up most closely with which ECG event?', o:['End of the T wave','Peak of the R wave','The P wave','The middle of the PR interval'], a:0, w:'The notch marks aortic valve closure at the end of ejection, which coincides with the end of ventricular repolarization (end of T). On a peripheral line it appears slightly later because of pulse travel time.'},
+ {scn:'jet', topic:'Cardiac cycle', s:'Why does stroke volume fall in this patient with a heart rate around 190?', o:['Diastolic filling time (especially diastasis) shortens and AV synchrony is lost','Systole shortens more than diastole','Afterload falls','The arterial line is resonating'], a:0, w:'Systolic time is relatively fixed, so tachycardia mostly steals diastolic filling time. In JET the atrial kick is also lost or mistimed (cannon a waves), further reducing filling.'},
+ {scn:'overdamped', topic:'Line fidelity', s:'This radial arterial line shows a rounded upstroke and no dicrotic notch. Press Fast flush: it returns slowly with no oscillation. What is the best next step?', o:['Check the system for air, clot, kinks or loose connections, flush, and repeat the test','Give a fluid bolus for the lower systolic pressure','Rely on the displayed systolic and diastolic values','Increase the vasoactive infusion to raise systolic pressure'], a:0, w:'This is an overdamped system: systolic is underestimated, diastolic overestimated, MAP relatively preserved. Fix the measurement before treating the number.'},
+ {scn:'underdamped', topic:'Line fidelity', s:'This infant’s arterial line shows a sharp systolic spike with ringing, and the cuff systolic is about 20 mmHg lower. Which value is most reliable while you troubleshoot?', o:['Mean arterial pressure','Systolic pressure','Diastolic pressure','Pulse pressure'], a:0, w:'Underdamping (resonance) exaggerates systolic and can lower diastolic; MAP is least affected. Fast infant heart rates make resonance more likely. Shorten tubing, remove extra stopcocks and extensions, or add a damping device.'},
+ {scn:'baseline', topic:'Line fidelity', s:'The pressure transducer slips off its holder and now hangs about 20 cm below the patient’s right atrium. What happens to the displayed pressures?', o:['All pressures read falsely high by about 15 mmHg','All pressures read falsely low by about 15 mmHg','Only systolic pressure changes','Nothing changes, because the line was zeroed earlier'], a:0, w:'A transducer below the reference level sees an extra column of fluid: about 0.74 mmHg per cm, so roughly 15 mmHg too high. Above the level, readings are falsely low. Re-level at the phlebostatic axis (and re-zero).'},
+ {scn:'jet', topic:'ECG', s:'Six hours after TOF repair: HR ~190 with narrow QRS complexes, P waves slower than and unrelated to the QRS, intermittent tall CVP waves. What is the most likely rhythm?', o:['Junctional ectopic tachycardia (JET)','Sinus tachycardia','Atrial flutter with 2:1 conduction','Ventricular tachycardia'], a:0, w:'JET is a narrow-complex tachycardia with AV dissociation, typically in the first 24–72 h after surgery near the AV node. Atria contract at random times relative to ventricular systole, producing cannon a waves.'},
+ {scn:'chb', topic:'CVP', s:'What produces the intermittent large CVP waves in this patient?', o:['Atrial contraction against a closed tricuspid valve when a P wave falls during ventricular systole','Tricuspid regurgitation with every beat','Positive-pressure breaths transmitted to the catheter','An overdamped CVP transducer'], a:0, w:'In complete heart block, atria and ventricles beat independently. When atrial contraction coincides with ventricular systole, the tricuspid valve is closed and pressure spikes. Because the timing keeps shifting, the cannon waves come and go.'},
+ {scn:'flutter', topic:'ECG', s:'This child after a Fontan has a regular narrow-complex rhythm at 150 bpm with a sawtooth baseline in lead II, and the venous tracing has lost its a wave. Most likely rhythm?', o:['Atrial flutter with 2:1 conduction','Sinus tachycardia','Junctional ectopic tachycardia','Atrial fibrillation'], a:0, w:'Flutter waves at ~300/min with 2:1 conduction give a regular ventricular rate of ~150. No organized atrial contraction means no a wave. Atrial flutter and intra-atrial reentry are common after atrial surgery and Fontan and are poorly tolerated.'},
+ {scn:'pvc', topic:'SpO₂ & pleth', s:'The HR box reads higher than the Pulse rate in the SpO₂ box. Why?', o:['Premature beats generate little stroke volume, so some ECG beats make no detectable peripheral pulse','The oximeter probe is on the wrong finger','The ECG is double-counting P waves','The arterial line is underdamped'], a:0, w:'HR comes from the ECG and Pulse from the pleth. PVCs arrive before the ventricle has filled, so their pulse is small or absent: a pulse deficit. Check the arterial and pleth traces after each wide beat.'},
+ {scn:'baseline', o:{motion:1}, topic:'SpO₂ & pleth', s:'The SpO₂ jumps around and the pleth is irregular and noisy, while the ECG and arterial line are clean. What should you do first?', o:['Assess the patient, then the probe and signal, before acting on the SpO₂ number','Increase FiO₂ to 100%','Start chest compressions','Silence the alarm for 2 minutes'], a:0, w:'Pulse oximetry is only as good as the pleth. Motion, probe position and low perfusion cause artifact. Look at the patient first (color, chest rise, arterial waveform), then fix the probe. Do not dismiss a real desaturation.'},
+ {scn:'bt', topic:'SpO₂ & pleth', s:'SpO₂ in this Norwood/BT-shunt neonate reads 81% with a clean pleth. What is the best interpretation?', o:['Often within the intended range for shunt-dependent physiology; compare with patient-specific targets and perfusion','Severe hypoxemia requiring immediate escalation','Probe artifact, because readings below 90% are unreliable','Proof that the shunt is occluded'], a:0, w:'Shunt-dependent mixing physiology typically targets SpO₂ of about 75–85%. Much higher can mean excessive pulmonary flow at the expense of systemic flow; much lower can mean too little. Interpret with perfusion, lactate and blood gases.'},
+ {scn:'tr', topic:'CVP', s:'Which description best fits this CVP waveform?', o:['Large systolic cv wave from tricuspid regurgitation','Cannon a waves from AV dissociation','Blunted y descent from tamponade','Normal a, c and v waves'], a:0, w:'A broad wave that starts with the QRS and peaks after the T wave reflects regurgitant flow into the RA during systole; the x descent is lost. The mean CVP overstates RV filling pressure.'},
+ {scn:'fontan', topic:'CVP', s:'After an extracardiac Fontan, what does this “CVP” number represent?', o:['Fontan pathway / pulmonary artery pressure that drives pulmonary blood flow','Right ventricular end-diastolic pressure','Left atrial pressure','Pulmonary capillary wedge pressure'], a:0, w:'With no subpulmonary ventricle, systemic venous pressure is what drives blood through the lungs. Fontan pressure minus common atrial pressure is the transpulmonary gradient.'},
+ {scn:'fontan', topic:'Integration', s:'In this spontaneously breathing Fontan patient, what happens to pulmonary blood flow during inspiration?', o:['It increases, because falling intrathoracic pressure draws blood into the lungs','It decreases, because inspiration raises intrathoracic pressure','It does not change; Fontan flow is independent of breathing','It reverses'], a:0, w:'Negative intrathoracic pressure during spontaneous inspiration augments passive pulmonary flow. High mean airway pressure and PEEP during positive-pressure ventilation can impede it, one reason early extubation is favoured after Fontan when feasible.'},
+ {scn:'bt', topic:'Arterial line', s:'Norwood with a modified BT shunt: the arterial line shows a wide pulse pressure and a steep fall after the notch. What best explains the low diastolic pressure?', o:['Diastolic runoff from the aorta into the pulmonary arteries through the shunt','Overdamping of the arterial line','Aortic valve stenosis','Severe hypovolemia'], a:0, w:'A systemic-to-pulmonary shunt keeps flowing in diastole, so aortic pressure falls quickly and pulse pressure widens. Low diastolic pressure can compromise coronary perfusion.'},
+ {scn:'hypovol', topic:'Arterial line', s:'Ventilated, closed chest, regular sinus rhythm, no spontaneous breaths. You see large cyclic swings in arterial pulse pressure and a CVP of 3. What is the best interpretation?', o:['The patient may be preload responsive; confirm with the clinical picture and the response to a measured bolus','Fluid responsiveness is confirmed; give boluses until the variation disappears','The arterial line is overdamped','This pattern is diagnostic of tamponade'], a:0, w:'Large pulse-pressure variation under controlled ventilation suggests the heart is on the steep part of the Frank–Starling curve, but its predictive value in children is weaker than in adults and depends on rhythm, tidal volume, chest status and RV function.'},
+ {scn:'tamponade', topic:'Integration', s:'6 h after an arterial switch: HR 175, low arterial pressure with a narrow pulse pressure, CVP 17 with a blunted y descent, exaggerated respiratory variation. Chest-tube output has dropped off. What is the most concerning explanation?', o:['Cardiac tamponade','Overdamped arterial line','Hypovolemia from bleeding','Junctional ectopic tachycardia'], a:0, w:'Rising CVP with narrowing pulse pressure, tachycardia, exaggerated respiratory variation and a blunted y descent after cardiac surgery is tamponade until proven otherwise, especially when chest-tube output suddenly falls. Hypovolemia would give a low CVP. Get a bedside echo and the surgical team.'},
+ {scn:'lowco', watch:true, topic:'Integration', s:'Watch for about a minute. Which combination best indicates falling cardiac output?', o:['Narrowing pulse pressure, a small pleth, and EtCO₂ falling with no change in ventilation','Wide pulse pressure with a low diastolic pressure','Large v waves on the CVP','A shark-fin capnogram'], a:0, w:'Low stroke volume narrows pulse pressure, vasoconstriction shrinks the pleth, and EtCO₂ falls as pulmonary blood flow falls. Combine with exam, lactate, NIRS and urine output.'},
+ {scn:'shunt', watch:true, topic:'Capnography', s:'Watch the monitor for about 30 seconds. In this shunt-dependent neonate, what develops and what does it suggest?', o:['EtCO₂ falls abruptly with a normal-shaped capnogram, then SpO₂ falls and diastolic pressure rises: suspect shunt occlusion','A shark-fin capnogram develops: suspect bronchospasm','The capnogram goes flat: suspect ETT dislodgement','EtCO₂ climbs slowly: suspect hypoventilation'], a:0, w:'EtCO₂ reflects pulmonary blood flow. A sudden fall with a preserved waveform shape, followed by desaturation and loss of diastolic runoff (higher diastolic, narrower pulse pressure), is shunt thrombosis until proven otherwise. This is an emergency.'},
+ {scn:'ett', watch:true, topic:'Capnography', s:'Watch the monitor. The capnogram suddenly goes flat while the heart rate and arterial waveform are unchanged. What is the most likely cause?', o:['ETT displacement or circuit disconnection','A sudden fall in cardiac output','Bronchospasm','The pulse oximeter probe falling off'], a:0, w:'A sudden flat capnogram with a perfusing rhythm means no CO₂ is reaching the sensor: displacement, disconnection or complete obstruction. Low cardiac output lowers EtCO₂ gradually, not to zero. SpO₂ lags; bradycardia comes late.'},
+ {scn:'bronch', topic:'Capnography', s:'What does this capnogram shape suggest?', o:['Expiratory airflow obstruction (bronchospasm, kinked or partially obstructed ETT)','Rebreathing of CO₂','Cardiogenic oscillations','A normal capnogram'], a:0, w:'A slow phase II rise and sloping phase III (shark fin, wider α angle) occur when alveoli empty unevenly because of obstruction. Rebreathing raises the inspiratory baseline instead.'},
+ {scn:'vf', watch:true, topic:'Capnography', s:'CPR is in progress. Watch the monitor. Which change suggests return of spontaneous circulation?', o:['An abrupt, sustained rise in EtCO₂ with an organized rhythm and arterial pulses','A gradual fall in EtCO₂','A larger compression artifact on the ECG','A rise in the SpO₂ number on its own'], a:0, w:'EtCO₂ reflects pulmonary blood flow, which jumps when the heart starts pumping. Confirm with an organized rhythm and an arterial waveform that persists during a pause in compressions. Persistently low EtCO₂ during CPR suggests poor compression quality.'}
+];
+function buildAssess(){
+  app.innerHTML=`<div class="stack" id="aRoot"></div>`;
+  const root=$('#aRoot');
+  let st=store.get('wl.assess.cur',null), mon=null;
+  const save=()=>store.set('wl.assess.cur',st);
+  const ensureMon=()=>{ if(mon) return; };
+  const intro=()=>{
+    const last=store.get('wl.assess.last',null);
+    root.innerHTML=`<section class="card"><div class="kicker">Knowledge Assessment</div><h2>Bedside waveform interpretation</h2>
+     <p>${AQ.length} multiple-choice questions on a live monitor: ECG, arterial line, CVP, SpO₂ and EtCO₂. Each question loads its own patient. Labels are turned off. Some questions ask you to watch the monitor change for 20–60 seconds.</p>
+     <p>You’ll see the correct answer and an explanation after each question, and a summary by topic at the end. This is a self-check, not a competency check-off, and there is no pass mark. Your answers are saved in this browser only.</p>
+     ${last?`<p class="muted">Last attempt: <b>${last.score} of ${last.n}</b> on ${esc(last.date)}.</p>`:''}
+     <div class="row">${st&&st.i<st.order.length?`<button type="button" class="btn" id="resume">Resume (question ${st.i+1} of ${st.order.length})</button><button type="button" class="btn sec" id="start">Start over</button>`:`<button type="button" class="btn" id="start">Start the assessment</button>`}</div></section>`;
+    $('#start').addEventListener('click',()=>{ st={order:shuffle(AQ.map((_,i)=>i)),i:0,ans:{}}; save(); question(); });
+    const r=$('#resume'); if(r) r.addEventListener('click',question);
+  };
+  const question=()=>{
+    const qi=st.order[st.i], q=AQ[qi], a=st.ans[qi];
+    root.innerHTML=`<div class="two wide-side"><div id="monHost"></div><article class="card sticky" id="qc"></article></div>
+     <details class="card wig-wrap"><summary style="cursor:pointer;font-weight:700">Reference: Wiggers diagram</summary><div id="wigHost" style="margin-top:12px"></div></details>`;
+    if(mon) mon.destroy();
+    mon=new Monitor($('#monHost'),sim,{labels:false,allowLabels:false});
+    sim.load(SCN[q.scn], q.o); mon.rescale(); sim.onChange=()=>mon.rescale();
+    const det=$('.wig-wrap'); det.addEventListener('toggle',()=>{ if(det.open && !$('#wigHost').firstChild){ $('#wigHost').innerHTML=WIG_HTML; new Wiggers($('#wigHost .wig')); $('#wigHost .wig').style.border='0'; $('#wigHost .wig').style.padding='0'; } },{once:false});
+    const qc=$('#qc'), n=st.order.length;
+    qc.innerHTML=`<div class="kicker">Question ${st.i+1} of ${n} · ${esc(q.topic)}</div><div class="prog" aria-hidden="true"><span style="width:${Math.round(st.i/n*100)}%"></span></div>
+     <p class="muted" style="font-size:13.5px;margin:10px 0 4px"><b>${esc(sim.P.patient)}</b> · ${esc(sim.P.dx)}</p>
+     ${q.watch?`<p class="watch">Watch the monitor: this patient changes over time.</p>`:''}
+     <div class="q" style="border:0;padding:0;margin:0" id="q"></div>
+     <div class="nav"><button type="button" class="btn sec" id="quit">Save & exit</button><span class="sp"></span><button type="button" class="btn" id="next"${a?'':' disabled'}>${st.i<n-1?'Next question →':'See results'}</button></div>`;
+    renderMCQ($('#q',qc),q,(ok,c,order)=>{ st.ans[qi]={c,ok,order}; save(); $('#next').disabled=false; }, a?{chosen:a.c,order:a.order}:null);
+    $('#next').addEventListener('click',()=>{ st.i++; save(); if(st.i<n) question(); else results(); });
+    $('#quit').addEventListener('click',()=>{ location.reload(); });
+    window.scrollTo({top:0});
+  };
+  const results=()=>{
+    const n=st.order.length, score=st.order.filter(i=>st.ans[i]&&st.ans[i].ok).length;
+    const topics={}; st.order.forEach(i=>{ const t=AQ[i].topic; topics[t]=topics[t]||[0,0]; topics[t][1]++; if(st.ans[i]&&st.ans[i].ok) topics[t][0]++; });
+    const date=new Date().toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'});
+    store.set('wl.assess.last',{score,n,date});
+    const missed=st.order.filter(i=>!(st.ans[i]&&st.ans[i].ok));
+    root.innerHTML=`<section class="card"><div class="kicker">Knowledge Assessment · results</div><h2>You answered ${score} of ${n} correctly</h2><p class="muted">${esc(date)}. Use the topic breakdown to choose which Learn modules to revisit.</p>
+     <div class="res-grid">${Object.entries(topics).map(([t,[c,k]])=>`<div class="card"><span class="muted" style="font-size:13px">${esc(t)}</span><b>${c} / ${k}</b></div>`).join('')}</div>
+     <div class="row no-print"><button type="button" class="btn" id="retake">Retake (new order)</button><button type="button" class="btn sec" id="print">Print summary</button><a class="btn sec" href="learn.html" style="text-decoration:none">Go to Learn</a></div></section>
+     <section class="card"><h2>${missed.length?'Review the questions you missed':'Review'}</h2><p class="muted" style="margin:0">${missed.length?'Each shows your answer, the correct answer and why.':'You answered every question correctly. Explanations for all questions are below.'}</p>
+     <div class="review">${(missed.length?missed:st.order).map(i=>{ const q=AQ[i], a=st.ans[i]||{}; return `<div class="card${a.ok?'':' no'}"><div class="kicker">${esc(q.topic)}</div><p style="font-weight:700;margin:4px 0">${q.s}</p>${a.ok?'':`<p style="margin:4px 0">Your answer: ${a.c!=null?q.o[a.c]:'(none)'}</p>`}<p style="margin:4px 0"><b>Correct:</b> ${q.o[q.a]}</p><p class="muted" style="margin:4px 0">${q.w}</p></div>`; }).join('')}</div></section>`;
+    $('#retake').addEventListener('click',()=>{ st={order:shuffle(AQ.map((_,i)=>i)),i:0,ans:{}}; save(); question(); });
+    $('#print').addEventListener('click',()=>window.print());
+    window.scrollTo({top:0});
+  };
+  if(st && st.i>=st.order.length) results(); else intro();
+}
+
+if(VARIANT==='learn') buildLearn(); else if(VARIANT==='assess') buildAssess(); else buildTeach();
+})();
+</script>
+</body>
+</html>
