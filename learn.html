@@ -208,9 +208,315 @@ h1,h2,h3,h4{font-family:"Atkinson Hyperlegible Next", "Segoe UI", "Helvetica Neu
 
 /* PAA-THEME:END */
 </style>
+
+<!-- paa-lesson-dock -->
+<style>
+/* Lesson dock: shared layout for Learn mode (module map, step, goal rows). Only takes effect when the dock script runs. */
+/* Pediatric APP Academy: lesson dock prototype (proposal for Kayleigh, not part of her labs).
+   Loaded after a lab page's own styles. Uses the lab's tokens (--room, --panel, --ink, --ink2,
+   --line, --accent, --ok, --info) and adds only the --paa-* gaps named in the design plan. */
+
+:root{
+  --paa-dock-w:420px;
+  --paa-bar-h:0px;
+  --paa-goal-bg:#DDEBF2;
+  --paa-ring-in:var(--room,#F5F4F0);
+  --paa-ring-out:#333F48;
+  --paa-focus-ring:0 0 0 2px var(--paa-ring-in), 0 0 0 4px var(--paa-ring-out);
+  --paa-focus-ring-dark:0 0 0 2px #14191E, 0 0 0 4px #F2C230;
+  --paa-cell:12px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --paa-goal-bg:#1F3340; --paa-ring-out:#F2C230; }
+}
+:root[data-theme="dark"]{ --paa-goal-bg:#1F3340; --paa-ring-out:#F2C230; }
+
+/* ---------- focus: two-tone ring, visible on light and dark surfaces (finding 15) ---------- */
+body.paa :focus-visible{ outline:none !important; box-shadow:var(--paa-focus-ring) !important; }
+body.paa .topbar :focus-visible,
+body.paa .vscreen :focus-visible,
+body.paa .mon-dev :focus-visible,
+body.paa .paa-dark :focus-visible{ box-shadow:var(--paa-focus-ring-dark) !important; }
+
+/* ---------- laptop and workstation: device left, lesson docked right ---------- */
+body.paa .bench{
+  grid-template-columns:minmax(0,1fr) var(--paa-dock-w);
+  grid-template-areas:"vent dock" "mon dock" "clin dock" "pt dock";
+  align-items:start; max-width:none;
+}
+body.paa .col-l, body.paa .col-r{ display:contents; }
+body.paa .vent-dev{ grid-area:vent; min-width:0; }
+body.paa .mon-dev{ grid-area:mon; min-width:0; }
+body.paa .clin{ grid-area:clin; min-width:0; }
+body.paa #ptCard{ grid-area:pt; min-width:0; margin:0; }
+body.paa .mscreen{ height:clamp(200px, 26vh, 320px); }
+body.paa.paa-compact .vscreen{ height:clamp(380px, 50vh, 520px); }
+body.paa footer.dock{ display:none; }
+body.paa #tabCaseBtn{ display:none; }
+
+#paa-dock{
+  grid-area:dock; position:sticky; top:12px; align-self:start;
+  height:calc(100dvh - 24px); max-height:calc(100dvh - 24px);
+  display:flex; flex-direction:column; min-width:0;
+  background:var(--panel,#fff); color:var(--ink); border:1px solid var(--line); border-radius:14px;
+  font-family:var(--font); font-size:16px; line-height:1.5;
+}
+.paa-handle{
+  position:absolute; left:-9px; top:0; bottom:0; width:12px; cursor:col-resize; touch-action:none;
+  display:flex; align-items:center; justify-content:center;
+}
+.paa-handle::before{ content:""; width:4px; height:44px; border-radius:2px; background:var(--line); }
+.paa-handle:hover::before, .paa-handle:focus-visible::before{ background:var(--shade,#9CADB7); }
+
+/* header: where am I */
+.paa-head{ padding:14px 18px 10px; border-bottom:1px solid var(--line); }
+.paa-head-top{ display:flex; gap:8px; align-items:center; justify-content:space-between; min-height:28px; }
+.paa-pos{ margin:0; font-size:14px; line-height:20px; color:var(--ink2); }
+.paa-title{ margin:2px 0 0; font-family:var(--serif); font-weight:700; font-size:19px; line-height:26px; color:var(--ink); }
+.paa-tools{ display:flex; gap:4px; flex:none; }
+.paa-iconbtn{ border:1px solid var(--line); background:transparent; color:var(--ink); border-radius:6px; padding:2px 8px; font-size:13px; line-height:20px; white-space:nowrap; }
+.paa-iconbtn[aria-pressed="true"]{ background:var(--panel2); border-color:var(--ink2); }
+
+.paa-note{ margin:8px 0 0; font-size:15px; line-height:22px; color:var(--ink2); max-width:60ch; }
+/* module list state: the map is the content */
+#paa-dock.paa-listmode .paa-head{ flex:1; min-height:0; display:flex; flex-direction:column; border-bottom:0; }
+#paa-dock.paa-listmode .paa-map{ flex:1; min-height:0; display:flex; flex-direction:column; }
+#paa-dock.paa-listmode .paa-map ol{ flex:1; max-height:none; }
+#paa-dock.paa-listmode .paa-map > summary{ display:none; }
+#paa-dock.paa-listmode .paa-body:empty, #paa-dock.paa-listmode .paa-foot:empty{ display:none; }
+#paa-dock.paa-listmode .paa-body{ flex:none; border-top:1px solid var(--line); }
+
+/* module map: modules are rows, steps are cells */
+.paa-map{ margin-top:10px; }
+.paa-map > summary{ list-style:none; cursor:pointer; display:flex; align-items:center; gap:10px; font-size:14px; color:var(--ink2); padding:4px 0; border-radius:6px; }
+.paa-map > summary::-webkit-details-marker{ display:none; }
+.paa-map > summary .paa-caret{ width:0; height:0; border:5px solid transparent; border-left-color:var(--ink2); transition:transform .12s; margin-left:2px; }
+.paa-map[open] > summary .paa-caret{ transform:rotate(90deg) translateX(2px); }
+.paa-map ol{ list-style:none; margin:6px 0 0; padding:0; max-height:min(46vh, 420px); overflow:auto; }
+.paa-row{
+  width:100%; display:grid; grid-template-columns:24px auto minmax(0,1fr); grid-template-rows:auto auto; column-gap:8px;
+  text-align:left; background:transparent; border:0; border-top:1px solid var(--line); padding:7px 4px; color:var(--ink); border-radius:0;
+}
+.paa-map li:first-child .paa-row{ border-top:0; }
+.paa-row:hover{ background:var(--panel2); }
+.paa-row[aria-current="true"]{ background:var(--panel2); }
+.paa-row .n{ grid-row:1 / span 2; font-family:var(--cond); font-weight:600; font-size:16px; font-variant-numeric:tabular-nums; color:var(--ink2); padding-top:1px; }
+.paa-row .t{ grid-column:2 / span 2; grid-row:1; font-size:15px; line-height:21px; min-width:0; }
+.paa-row .cells{ grid-column:2; grid-row:2; margin-top:4px; }
+.paa-row .sum{ grid-column:3; grid-row:2; font-size:13px; line-height:20px; color:var(--ink2); margin-top:1px; min-width:0; }
+
+.cells{ display:flex; gap:3px; align-items:center; }
+.cell{ width:var(--paa-cell); height:var(--paa-cell); border:1.5px solid var(--ink2); border-radius:2px; flex:none; box-sizing:border-box; }
+.cell.done{ background:var(--ok); border-color:var(--ok); }
+.cell.skip{ background:repeating-linear-gradient(135deg, var(--ink2) 0 1.5px, transparent 1.5px 4px); }
+.cell.cur{ border-color:var(--accent); box-shadow:0 0 0 2px var(--accent); }
+.cell.cur.done{ box-shadow:0 0 0 2px var(--accent); }
+
+/* body: the current step */
+.paa-body{ flex:1; overflow:auto; padding:14px 18px 18px; min-height:0; overscroll-behavior:contain; }
+.paa-body:focus{ outline:none; }
+.paa-kind{ margin:0 0 6px; font-size:14px; line-height:20px; color:var(--ink2); }
+.paa-kind:focus{ outline:none; }
+.paa-body p{ margin:0 0 12px; max-width:62ch; }
+.paa-body > *{ max-width:640px; }
+.paa-body p:last-child{ margin-bottom:0; }
+.paa-intro{ color:var(--ink2); font-size:15px; }
+.paa-continue{ display:block; width:100%; text-align:left; margin:4px 0 14px; padding:10px 12px; border:1px solid var(--ink2); border-radius:10px; background:var(--panel2); color:var(--ink); }
+.paa-continue b{ display:block; }
+
+/* demonstration: what to look at on the device */
+.paa-look{ list-style:none; margin:12px 0; padding:0; border-left:3px solid var(--line); }
+.paa-look li{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:4px 0 4px 12px; font-size:15px; }
+.paa-look .what{ font-family:var(--cond); font-weight:600; font-size:17px; }
+
+/* guided exercise: the goal rows (the one memorable thing) */
+.paa-goal{ margin:14px 0 10px; border-radius:10px; background:var(--paa-goal-bg); padding:4px 0; }
+.paa-goal table{ width:100%; border-collapse:collapse; }
+.paa-goal th, .paa-goal td{ padding:6px 8px; text-align:left; font-weight:400; vertical-align:baseline; }
+.paa-goal tr > :first-child{ padding-left:12px; }
+.paa-goal tr > :last-child{ padding-right:12px; }
+.paa-goal thead th{ font-size:13px; color:var(--ink2); padding-top:6px; padding-bottom:0; }
+.paa-goal tbody tr + tr td, .paa-goal tbody tr + tr th{ border-top:1px solid color-mix(in srgb, var(--ink2) 28%, transparent); }
+.paa-goal .p{ font-family:var(--cond); font-weight:600; font-size:18px; line-height:24px; }
+.paa-goal .p button{ white-space:nowrap; }
+.paa-goal .p .u{ display:block; font-family:var(--font); font-weight:400; font-size:13px; line-height:17px; color:var(--ink2); }
+.paa-goal .p button{ all:unset; cursor:pointer; border-bottom:1px dotted var(--ink2); }
+.paa-goal .p button:focus-visible{ box-shadow:var(--paa-focus-ring) !important; border-radius:3px; }
+.paa-goal .tg{ font-family:var(--cond); font-size:18px; font-variant-numeric:tabular-nums; }
+.paa-goal .now{ font-family:var(--cond); font-weight:600; font-size:20px; font-variant-numeric:tabular-nums; text-align:right; white-space:nowrap; }
+.paa-goal .st{ font-size:14px; text-align:right; }
+.paa-goal tbody .st{ white-space:nowrap; }
+.paa-goal tr.met .st{ color:var(--ink); font-weight:700; }
+.paa-goal tr.met .st::before{ content:""; display:inline-block; width:8px; height:8px; margin-right:6px; background:var(--ok); border-radius:2px; vertical-align:1px; }
+.paa-goal tr.not .st{ color:var(--ink2); }
+.paa-goal tr.not .st::before{ content:""; display:inline-block; width:8px; height:8px; margin-right:6px; border:1.5px solid var(--ink2); border-radius:2px; vertical-align:0; box-sizing:border-box; }
+.paa-status{ margin:4px 0 12px; font-size:15px; color:var(--ink2); }
+.paa-status.met{ color:var(--ink); }
+.paa-status.met b{ color:var(--ok); }
+.paa-status b{ display:block; }
+.paa-hint{ margin:8px 0; }
+.paa-hint summary{ cursor:pointer; color:var(--ink); font-size:15px; display:inline-block; border-radius:6px; }
+.paa-hint p{ margin:6px 0 0; font-size:15px; color:var(--ink2); }
+.paa-inline{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+
+/* knowledge check */
+.paa-stem{ font-family:var(--serif); font-size:19px; line-height:27px; margin:0 0 12px; font-weight:400; max-width:56ch; }
+.paa-opts{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; }
+.paa-opt{
+  width:100%; display:grid; grid-template-columns:28px minmax(0,1fr); gap:8px; align-items:start; text-align:left;
+  border:1px solid var(--line); background:var(--panel); color:var(--ink); border-radius:10px; padding:9px 12px; font-size:15px; line-height:21px;
+}
+.paa-opt:hover:not(:disabled){ border-color:var(--ink2); }
+.paa-opt .k{ font-family:var(--cond); font-weight:600; font-size:17px; color:var(--ink2); }
+.paa-opt:disabled{ cursor:default; opacity:1; }
+.paa-opt.right{ border:2px solid var(--ok); padding:8px 11px; }
+.paa-opt.wrong{ border:2px solid var(--ink2); padding:8px 11px; }
+.paa-opt .tag{ display:block; font-size:13px; font-weight:700; margin-top:2px; }
+.paa-opt.right .tag{ color:var(--ok); }
+.paa-opt.wrong .tag{ color:var(--ink2); }
+.paa-feedback{ margin-top:12px; padding:10px 12px; border-left:3px solid var(--ink2); font-size:15px; }
+.paa-feedback.right{ border-left-color:var(--ok); }
+.paa-feedback b{ display:block; }
+.paa-feedback:focus{ outline:none; }
+
+/* read ahead */
+.paa-ahead-note{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin:0 0 12px; padding:8px 12px; border-radius:10px; background:var(--panel2); font-size:14px; }
+.paa-steplist{ list-style:none; margin:0 0 14px; padding:0; counter-reset:s; }
+.paa-steplist li{ display:grid; grid-template-columns:24px minmax(0,1fr); gap:8px; padding:8px 0; border-top:1px solid var(--line); font-size:15px; }
+.paa-steplist li:first-child{ border-top:0; }
+.paa-steplist .n{ font-family:var(--cond); font-weight:600; color:var(--ink2); }
+.paa-steplist .k{ display:block; font-size:13px; color:var(--ink2); }
+
+/* finished */
+.paa-facts{ margin:8px 0 14px; display:grid; grid-template-columns:auto 1fr; gap:4px 14px; font-size:15px; }
+.paa-facts dt{ font-family:var(--cond); font-weight:600; font-size:20px; font-variant-numeric:tabular-nums; text-align:right; }
+.paa-facts dd{ margin:0; align-self:center; color:var(--ink2); }
+
+/* footer: move through the module */
+.paa-foot{ display:flex; gap:8px; align-items:center; padding:10px 18px 12px; border-top:1px solid var(--line); flex-wrap:wrap; }
+.paa-foot .why{ flex:1 1 100%; order:-1; margin:0; font-size:13px; color:var(--ink2); }
+.paa-foot .spacer{ flex:1; }
+.paa-btn{ border:1px solid var(--line); background:var(--panel); color:var(--ink); border-radius:8px; padding:7px 14px; font-size:15px; line-height:21px; font-weight:500; }
+.paa-btn:hover:not(:disabled){ border-color:var(--ink2); }
+.paa-btn.primary{ background:var(--ink); color:var(--room); border-color:var(--ink); font-weight:700; }
+.paa-btn:disabled{ opacity:.45; cursor:not-allowed; }
+.paa-bar{ display:none; }
+
+/* device focus: dock becomes a slim rail */
+body.paa.paa-devicefocus{ --paa-dock-w:76px; }
+body.paa-devicefocus #paa-dock .paa-head, body.paa-devicefocus #paa-dock .paa-body, body.paa-devicefocus #paa-dock .paa-foot, body.paa-devicefocus .paa-handle{ display:none; }
+.paa-rail{ display:none; }
+body.paa-devicefocus .paa-rail{ display:flex; flex-direction:column; align-items:center; gap:10px; padding:12px 6px; height:100%; }
+.paa-rail .r-step{ font-family:var(--cond); font-weight:600; font-size:20px; font-variant-numeric:tabular-nums; }
+.paa-rail .r-goal{ font-size:12px; text-align:center; color:var(--ink2); line-height:16px; }
+.paa-rail .r-goal.met{ color:var(--ok); font-weight:700; }
+.paa-rail .paa-btn{ padding:6px 8px; font-size:14px; }
+
+/* "Show on device": user-triggered only */
+.paa-ping{ outline:3px solid var(--accent) !important; outline-offset:2px; animation:paa-ping 0.9s ease-out 2; position:relative; z-index:3; }
+@keyframes paa-ping{ 0%{ outline-offset:2px; } 50%{ outline-offset:7px; } 100%{ outline-offset:2px; } }
+@media (prefers-reduced-motion: reduce){ .paa-ping{ animation:none; } .paa-map > summary .paa-caret{ transition:none; } }
+
+.paa-sr{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+
+/* ---------- tablet landscape: narrower dock ---------- */
+@media (max-width: 1260px) and (min-width: 1100px){ :root{ --paa-dock-w:360px; } }
+
+/* ---------- below 1100 px: stack the device, lesson becomes a bottom sheet ---------- */
+@media (max-width: 1099px){
+  body.paa .bench{ grid-template-columns:minmax(0,1fr); grid-template-areas:"vent" "mon" "clin" "pt"; }
+  body.paa{ padding-bottom:var(--paa-bar-h); }
+  body.paa.paa-sheet-open{ padding-bottom:58dvh; }
+  .paa-handle, .paa-tools [data-paa="focus"]{ display:none; }
+  #paa-dock{
+    position:fixed; left:0; right:0; bottom:0; top:auto; z-index:20; height:auto; max-height:none;
+    border-radius:14px 14px 0 0; border-bottom:0; box-shadow:0 -4px 16px rgba(20,30,40,.22);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  body.paa:not(.paa-sheet-open) #paa-dock .paa-head,
+  body.paa:not(.paa-sheet-open) #paa-dock .paa-body,
+  body.paa:not(.paa-sheet-open) #paa-dock .paa-foot{ display:none; }
+  body.paa.paa-sheet-open #paa-dock{ height:58dvh; }
+  .paa-bar{ display:flex; align-items:center; gap:10px; padding:8px 12px; min-height:56px; }
+  .paa-bar .b-open{ all:unset; flex:1; min-width:0; cursor:pointer; display:flex; flex-direction:column; border-radius:8px; padding:2px 4px; }
+  .paa-bar .b-open:focus-visible{ box-shadow:var(--paa-focus-ring) !important; }
+  .paa-bar .b-pos{ font-size:13px; color:var(--ink2); line-height:18px; }
+  .paa-bar .b-what{ font-size:15px; line-height:20px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .paa-bar .b-what .num{ font-family:var(--cond); font-weight:600; font-size:17px; }
+  body.paa.paa-sheet-open .paa-bar{ border-bottom:1px solid var(--line); }
+  body.paa.paa-sheet-open .paa-bar .b-next{ display:none; }
+  #paa-dock .paa-head-top, #paa-dock .paa-title{ display:none; }
+  #paa-dock.paa-listmode .paa-title{ display:block; }
+  .paa-foot .paa-btn{ padding:6px 11px; font-size:14px; }
+  .paa-body{ padding:12px 16px 16px; }
+  .paa-head{ padding:10px 16px 8px; }
+  .paa-foot{ padding:8px 16px 10px; }
+}
+
+/* ---------- phone: collapse the toolbar ---------- */
+@media (max-width: 760px){
+  body.paa .simctl{ flex-wrap:wrap; overflow:visible !important; }
+  body.paa .simctl > :not(#btnPause):not(.paa-simbtn){ display:none !important; }
+  body.paa .simctl.paa-open > :not(#btnPause):not(.paa-simbtn){ display:inline-flex !important; }
+  body.paa .simctl.paa-open{ row-gap:6px; }
+  .paa-simbtn{ display:inline-flex !important; }
+  .paa-title{ font-size:18px; line-height:24px; }
+  .paa-stem{ font-size:18px; line-height:26px; }
+  .paa-goal th, .paa-goal td{ padding:6px 10px; }
+  .paa-goal .st{ width:auto; }
+  .paa-map ol{ max-height:38dvh; }
+}
+@media (min-width: 761px){ .paa-simbtn{ display:none !important; } }
+
+/* programmatic focus targets (step heading, feedback) move focus for screen readers without a ring */
+body.paa .paa-kind:focus-visible, body.paa .paa-feedback:focus-visible, body.paa #step .fb:focus-visible{ box-shadow:none !important; }
+/* resize guide: moved with transform only while dragging the dock edge */
+.paa-guide{ position:fixed; top:0; bottom:0; left:0; width:2px; background:var(--accent); z-index:30; pointer-events:none; will-change:transform; }
+
+/* round 2 */
+.paa-map > summary .m-sum{ display:flex; align-items:center; gap:8px; white-space:nowrap; }
+.paa-steplink{ all:unset; cursor:pointer; display:block; border-radius:6px; padding:0 2px; }
+.paa-steplink:hover{ background:var(--panel2); }
+.paa-steplink:focus-visible{ box-shadow:var(--paa-focus-ring) !important; }
+.paa-skip{ position:absolute; left:8px; top:-60px; z-index:100; background:var(--panel); color:var(--ink); padding:8px 12px; border-radius:8px; border:1px solid var(--ink); }
+.paa-skip:focus{ top:8px; }
+/* the lab's own notices sit over the device, not over the lesson */
+body.paa .toast{ left:calc((100vw - var(--paa-dock-w)) / 2); }
+/* device focus: give the device the lab's original side-by-side layout, with the lesson as a rail */
+body.paa.paa-devicefocus .bench{ grid-template-columns:minmax(0,1.65fr) minmax(300px,1fr) var(--paa-dock-w); grid-template-areas:"vent mon dock" "clin pt dock"; }
+@media (max-width: 1099px){
+  body.paa .toast{ left:50%; bottom:calc(var(--paa-bar-h) + 10px); }
+  body.paa.paa-sheet-open .toast{ bottom:calc(58dvh + 10px); }
+  #paa-dock .paa-head{ padding-top:6px; padding-bottom:6px; }
+  #paa-dock .paa-map{ margin-top:0; }
+}
+/* short windows, including 200% zoom: the sheet takes more of the screen and the map folds away */
+@media (max-width: 1099px) and (max-height: 600px){
+  body.paa.paa-sheet-open #paa-dock{ height:88dvh; }
+  body.paa.paa-sheet-open{ padding-bottom:88dvh; }
+  body.paa.paa-sheet-open .toast{ bottom:calc(88dvh + 10px); }
+}
+</style>
+<!-- /paa-lesson-dock -->
 </head>
 <body>
 <script>window.WL_VARIANT='learn';</script>
+<!-- paa-lesson-dock -->
+<script>
+/* Lesson dock, Waveform Learn: turns learn.html#m3-s2 into the saved position before the lab starts */
+if (window.WL_VARIANT === 'learn') {
+/* Waveform Lab Learn, runs in <head> before the lab's own script.
+   Turns an address like learn.html#m3-s2 into the lab's own saved position (wl.learn.pos),
+   which the lab already reads when it builds the Learn page. */
+(function () {
+  try { window.PAA_FIRST_VISIT = !localStorage.getItem('wl.learn.pos') && !location.hash; } catch (e) { window.PAA_FIRST_VISIT = false; }
+  var m = /^#m(\d+)(?:-s(\d+))?$/.exec(location.hash);
+  if (!m) return;
+  try { localStorage.setItem('wl.learn.pos', JSON.stringify({ m: +m[1] - 1, s: m[2] ? +m[2] - 1 : 0 })); } catch (e) { /* private window */ }
+})();
+}
+</script>
+<!-- /paa-lesson-dock -->
 <header class="top">
   <div class="paa-hdr"><span class="paa-slot"></span><!--paa-home--><a class="paa-home" href="https://kayleighatodd-88.github.io/pediatric-app-academy/" aria-label="Pediatric APP Academy home"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 42 L24 6 L40 42" fill="none" stroke="#F4F5F6" stroke-width="4.5" stroke-linejoin="round" stroke-linecap="round"/><path d="M12.5 30 H19.5 L21.75 24 L25 36 L27.25 30 H35.5" fill="none" stroke="#F2C230" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/></svg><span class="t"><small>The Pediatric</small><b>APP Academy</b></span></a><!--/paa-home--><div>
     <h1><a href="index.html">CICU Waveform Lab</a></h1>
@@ -1254,8 +1560,484 @@ function buildAssess(){
   if(st && st.i>=st.order.length) results(); else intro();
 }
 
+window.PAA_LAB={MODS:MODS}; // read-only: lets the lesson dock read the module list
 if(VARIANT==='learn') buildLearn(); else if(VARIANT==='assess') buildAssess(); else buildTeach();
 })();
 </script>
+
+<!-- paa-lesson-dock -->
+<script>
+/* Lesson dock, shared part */
+/* Pediatric APP Academy: lesson dock prototype, shared part.
+   A proposal for Kayleigh. It adds a docked lesson panel to a copy of a lab page and draws
+   into it; each lab's adapter script supplies the content from that lab's own lesson data.
+   Nothing here changes how a lab simulates, scores or saves. */
+(function () {
+  'use strict';
+  const doc = document;
+  const h = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* private window: fine */ } }
+  };
+  const narrow = () => matchMedia('(max-width: 1099px)').matches;
+  const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function shell(opts) {
+    const grid = opts.grid;
+    const lab = opts.lab;
+    doc.body.classList.add('paa');
+    const dock = doc.createElement('aside');
+    dock.id = 'paa-dock';
+    dock.setAttribute('aria-label', 'Lesson');
+    dock.innerHTML = `
+      <div class="paa-handle" role="separator" aria-orientation="vertical" aria-label="Resize lesson panel" tabindex="0"></div>
+      <div class="paa-bar">
+        <button class="b-open" type="button" aria-expanded="false" aria-controls="paa-dock"><span class="b-pos"></span><span class="b-what"></span></button>
+        <button class="paa-btn primary b-next" type="button" hidden></button>
+      </div>
+      <div class="paa-rail"><span class="r-step"></span><span class="r-goal"></span><button class="paa-btn r-next" type="button" hidden>Next</button><button class="paa-btn r-back" type="button" aria-pressed="true" title="Show the lesson panel">Lesson</button></div>
+      <header class="paa-head">
+        <div class="paa-head-top">
+          <p class="paa-pos"></p>
+          <div class="paa-tools">
+            ${opts.compact ? '<button class="paa-iconbtn" type="button" data-paa="compact" aria-pressed="false" title="Make the ventilator shorter so more of the page fits">Compact</button>' : ''}
+            ${opts.copyLink ? '<button class="paa-iconbtn" type="button" data-paa="copy" hidden title="Copy a link that opens this module">Copy link</button>' : ''}
+            <button class="paa-iconbtn" type="button" data-paa="focus" aria-pressed="false" title="Give the device the screen; the lesson shrinks to a rail">Device focus</button>
+          </div>
+        </div>
+        <h2 class="paa-title"></h2>
+        <p class="paa-note" hidden></p>
+        <details class="paa-map"><summary><span class="paa-caret" aria-hidden="true"></span><span class="m-sum">All modules</span></summary><ol></ol></details>
+      </header>
+      <div class="paa-body" tabindex="-1"></div>
+      <footer class="paa-foot"></footer>`;
+    grid.appendChild(dock);
+    const r = {
+      dock, grid,
+      pos: dock.querySelector('.paa-pos'), title: dock.querySelector('.paa-title'), note: dock.querySelector('.paa-note'),
+      map: dock.querySelector('.paa-map'), mapList: dock.querySelector('.paa-map ol'), mapSum: dock.querySelector('.m-sum'),
+      body: dock.querySelector('.paa-body'), foot: dock.querySelector('.paa-foot'),
+      bar: dock.querySelector('.paa-bar'), barOpen: dock.querySelector('.b-open'), barPos: dock.querySelector('.b-pos'), barWhat: dock.querySelector('.b-what'), barNext: dock.querySelector('.b-next'),
+      rail: dock.querySelector('.paa-rail'), railStep: dock.querySelector('.r-step'), railGoal: dock.querySelector('.r-goal'), railNext: dock.querySelector('.r-next')
+    };
+
+    /* width: drag the left edge, or arrow keys on it; remembered */
+    const root = doc.documentElement;
+    const saved = store.get('paa_dock_w', null);
+    if (saved) root.style.setProperty('--paa-dock-w', saved + 'px');
+    const handle = dock.querySelector('.paa-handle');
+    const clampW = (w) => Math.max(340, Math.min(560, Math.round(w)));
+    /* While dragging, only a guide line moves (transform, no layout), so the device's
+       canvases are not resized every frame. The new width is applied once, on release. */
+    const guide = doc.createElement('div');
+    guide.className = 'paa-guide'; guide.hidden = true; doc.body.appendChild(guide);
+    let dragging = false, right = 0, want = 0, raf = 0;
+    const moveGuide = () => { raf = 0; guide.style.transform = `translateX(${Math.round(right - want)}px)`; };
+    handle.addEventListener('pointerdown', (e) => {
+      dragging = true; handle.setPointerCapture(e.pointerId); e.preventDefault();
+      const r0 = dock.getBoundingClientRect(); right = r0.right; want = r0.width;
+      guide.hidden = false; moveGuide();
+    });
+    handle.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      want = clampW(right - e.clientX);
+      if (!raf) raf = requestAnimationFrame(moveGuide);
+    });
+    const end = () => {
+      if (!dragging) return; dragging = false; guide.hidden = true;
+      root.style.setProperty('--paa-dock-w', want + 'px'); store.set('paa_dock_w', want);
+    };
+    handle.addEventListener('pointerup', end);
+    handle.addEventListener('pointercancel', end);
+    handle.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      const w = clampW(dock.getBoundingClientRect().width + (e.key === 'ArrowLeft' ? 24 : -24));
+      root.style.setProperty('--paa-dock-w', w + 'px'); store.set('paa_dock_w', w);
+    });
+
+    /* copy a link to the current module (for "do Module 3 before Thursday") */
+    const copyBtn = dock.querySelector('[data-paa="copy"]');
+    let copyHash = null;
+    r.setCopy = (hash) => { copyHash = hash; if (copyBtn) copyBtn.hidden = !hash; };
+    if (copyBtn) copyBtn.addEventListener('click', async () => {
+      const url = location.href.split('#')[0] + copyHash;
+      try { await navigator.clipboard.writeText(url); copyBtn.textContent = 'Link copied'; }
+      catch (e) { prompt('Copy this link', url); }
+      setTimeout(() => { copyBtn.textContent = 'Copy link'; }, 2000);
+    });
+
+    /* skip link for keyboard users: straight to the lesson */
+    const skip = doc.createElement('a');
+    skip.href = '#paa-dock'; skip.className = 'paa-skip'; skip.textContent = 'Skip to lesson';
+    skip.addEventListener('click', (e) => { e.preventDefault(); if (narrow()) setSheet(true); const t = dock.querySelector('.paa-kind') || dock.querySelector('.paa-row') || r.barOpen; if (t) { if (!t.hasAttribute('tabindex') && !/BUTTON|A/.test(t.tagName)) t.tabIndex = -1; t.focus(); } });
+    doc.body.prepend(skip);
+
+    /* device focus rail */
+    const focusBtn = dock.querySelector('[data-paa="focus"]');
+    const setFocus = (on) => {
+      doc.body.classList.toggle('paa-devicefocus', on);
+      focusBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      store.set('paa_devicefocus_' + lab, on);
+      if (!on) focusBtn.focus({ preventScroll: true });
+    };
+    focusBtn.addEventListener('click', () => setFocus(true));
+    dock.querySelector('.r-back').addEventListener('click', () => setFocus(false));
+    if (store.get('paa_devicefocus_' + lab, false) && !narrow()) setFocus(true);
+
+    /* compact ventilator */
+    const compactBtn = dock.querySelector('[data-paa="compact"]');
+    if (compactBtn) {
+      const setC = (on) => { doc.body.classList.toggle('paa-compact', on); compactBtn.setAttribute('aria-pressed', on ? 'true' : 'false'); store.set('paa_compact_' + lab, on); };
+      compactBtn.addEventListener('click', () => setC(!doc.body.classList.contains('paa-compact')));
+      setC(store.get('paa_compact_' + lab, false));
+    }
+
+    /* the dock fills the window from wherever it starts, so its footer is always on screen.
+       One read of the grid's top per scroll frame; writes only when the value changes. */
+    let lastH = -1, rafId = 0;
+    const fit = () => {
+      rafId = 0;
+      if (narrow()) { if (lastH !== 0) { dock.style.height = ''; lastH = 0; } return; }
+      const top = Math.max(12, grid.getBoundingClientRect().top + 12);
+      const hgt = Math.round(innerHeight - top - 12);
+      if (hgt !== lastH) { dock.style.height = hgt + 'px'; lastH = hgt; }
+    };
+    const queue = () => { if (!rafId) rafId = requestAnimationFrame(fit); };
+    addEventListener('scroll', queue, { passive: true });
+    addEventListener('resize', queue);
+    fit();
+
+    /* bottom sheet below 1100 px */
+    /* opening the sheet brings the controls the step is about (opts.anchor) into the space above it */
+    const alignAnchor = () => {
+      const el = opts.anchor && opts.anchor();
+      if (!el || !narrow() || !doc.body.classList.contains('paa-sheet-open')) return;
+      const room = innerHeight - dock.getBoundingClientRect().height;
+      const rect = el.getBoundingClientRect();
+      if (rect.top >= 0 && rect.bottom <= room) return;
+      scrollTo({ top: Math.max(0, scrollY + rect.bottom - room + 8), behavior: 'auto' });
+    };
+    const setSheet = (open) => {
+      doc.body.classList.toggle('paa-sheet-open', open);
+      r.barOpen.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open) requestAnimationFrame(alignAnchor);
+    };
+    r.alignAnchor = () => requestAnimationFrame(alignAnchor);
+    r.barOpen.addEventListener('click', () => setSheet(!doc.body.classList.contains('paa-sheet-open')));
+    doc.addEventListener('keydown', (e) => { if (e.key === 'Escape' && narrow() && doc.body.classList.contains('paa-sheet-open') && !doc.querySelector('.modal')) { setSheet(false); r.barOpen.focus(); } });
+    r.setSheet = setSheet;
+    if ('ResizeObserver' in window) {
+      new ResizeObserver(() => {
+        const hgt = narrow() ? Math.ceil(r.bar.getBoundingClientRect().height) : 0;
+        root.style.setProperty('--paa-bar-h', hgt + 'px');
+      }).observe(r.bar);
+    }
+
+    /* phone: the toolbar collapses to Pause plus a Simulator menu */
+    if (opts.toolbar) {
+      const tb = doc.querySelector(opts.toolbar);
+      if (tb) {
+        const b = doc.createElement('button');
+        b.type = 'button'; b.className = 'btn paa-simbtn'; b.textContent = 'Simulator'; b.setAttribute('aria-expanded', 'false');
+        b.addEventListener('click', () => { const open = tb.classList.toggle('paa-open'); b.setAttribute('aria-expanded', open ? 'true' : 'false'); });
+        const pause = tb.querySelector('#btnPause');
+        if (pause) pause.after(b); else tb.prepend(b);
+      }
+    }
+    return r;
+  }
+
+  /* map cells: shape first, color second */
+  function cells(states, label) {
+    const n = states.length;
+    const done = states.filter((s) => s === 'done' || s === 'cur-done').length;
+    const skip = states.filter((s) => s === 'skip').length;
+    const spans = states.map((s) => `<span class="cell ${s === 'cur-done' ? 'cur done' : s}"></span>`).join('');
+    const text = `${done} of ${n} steps done${skip ? `, ${skip} skipped` : ''}${label ? ', ' + label : ''}`;
+    return `<span class="cells" aria-hidden="true">${spans}</span><span class="paa-sr">${h(text)}</span>`;
+  }
+
+  /* goal rows: parameter, target, now, status */
+  function goalTable(rows, caption, nowLabel) {
+    return `<div class="paa-goal"><table>
+      <thead><tr><th scope="col">${h(caption || 'Goal')}</th><th scope="col">Target</th><th scope="col" style="text-align:right">${h(nowLabel || 'Now')}</th><th scope="col" class="st"><span class="paa-sr">Status</span></th></tr></thead>
+      <tbody>${rows.map((g, i) => `<tr data-g="${i}" class="not"><th scope="row" class="p">${g.find ? `<button type="button" data-show="${i}" title="Show on device">${h(g.label)}</button>` : h(g.label)}${g.unit ? `<span class="u">${h(g.unit)}</span>` : ''}</th><td class="tg">${h(g.target)}</td><td class="now">–</td><td class="st">not yet</td></tr>`).join('')}</tbody></table></div>`;
+  }
+  function updateGoal(container, rows, ctx) {
+    let all = true;
+    rows.forEach((g, i) => {
+      const tr = container.querySelector(`tr[data-g="${i}"]`); if (!tr) return;
+      let v, ok = false;
+      try { v = g.value(ctx); ok = !!g.ok(v, ctx); } catch (e) { v = null; ok = false; }
+      all = all && ok;
+      const shown = v == null || (typeof v === 'number' && !isFinite(v)) ? '–' : typeof v === 'number' ? v.toFixed(g.dec == null ? 0 : g.dec) : String(v);
+      const now = tr.querySelector('.now'); if (now.textContent !== shown) now.textContent = shown;
+      const cls = ok ? 'met' : 'not';
+      if (!tr.classList.contains(cls)) { tr.classList.remove('met', 'not'); tr.classList.add(cls); tr.querySelector('.st').textContent = ok ? 'met' : 'not yet'; }
+    });
+    return all;
+  }
+
+  /* "Show on device": scroll the control into view and outline it (user-triggered) */
+  function ping(el) {
+    if (!el) return;
+    // first any scrolling panel the control sits in (for example the ventilator's numbers column)
+    for (let p = el.parentElement; p && p !== doc.body; p = p.parentElement) {
+      const cs = getComputedStyle(p);
+      if (/(auto|scroll)/.test(cs.overflowY) && p.scrollHeight > p.clientHeight + 4) {
+        const pr = p.getBoundingClientRect(), er = el.getBoundingClientRect();
+        if (er.top < pr.top) p.scrollTop -= pr.top - er.top + 8;
+        else if (er.bottom > pr.bottom) p.scrollTop += er.bottom - pr.bottom + 8;
+      }
+    }
+    // then the page, by the smallest amount that brings it into view (above the sheet on phones)
+    const rect = el.getBoundingClientRect();
+    const sheetTop = narrow() ? innerHeight - dock_h() : innerHeight;
+    let dy = 0;
+    if (rect.top < 8) dy = rect.top - 8;
+    else if (rect.bottom > sheetTop - 8) dy = rect.bottom - (sheetTop - 8);
+    if (dy) scrollBy({ top: dy, behavior: reduced() ? 'auto' : 'smooth' });
+    el.classList.remove('paa-ping'); void el.offsetWidth; el.classList.add('paa-ping');
+    setTimeout(() => el.classList.remove('paa-ping'), 2200);
+  }
+  function dock_h() { const d = doc.getElementById('paa-dock'); return d ? d.getBoundingClientRect().height : 0; }
+
+  window.PAADock = { shell, cells, goalTable, updateGoal, ping, esc: h, store, narrow };
+})();
+</script>
+<script>
+/* Lesson dock, Waveform Learn: dresses the Learn page as the dock */
+if (window.WL_VARIANT === 'learn') {
+/* Waveform Lab Learn: lesson dock adapter (prototype).
+   The lab's own buildLearn() still renders every step, loads every scenario and saves progress
+   (wl.learn, wl.learn.pos). This adapter moves its step card into the shared dock, draws the
+   module map from that saved progress, and re-dresses each step after the lab redraws it. */
+(function () {
+  'use strict';
+  const MODS = window.PAA_LAB && window.PAA_LAB.MODS;
+  if (!MODS || !document.getElementById('step')) return;
+  const D = window.PAADock, esc = D.esc;
+
+  /* map this lab's token names onto the shared ones (the --paa-* alias gap in the design plan) */
+  const fonts = document.createElement('link');
+  fonts.rel = 'stylesheet';
+  fonts.href = 'https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;600&display=swap';
+  document.head.appendChild(fonts);
+  const css = document.createElement('style');
+  css.textContent = `
+    body.paa{ --room:var(--bg); --ink2:var(--muted); --ok:var(--good); --ok-bg:var(--goodbg); --panel2:var(--chip); --accent:var(--orange); --shade:#9CADB7;
+      --font:"Atkinson Hyperlegible Next","Segoe UI",Arial,sans-serif; --serif:"Charis SIL",Georgia,serif; --cond:"Barlow Semi Condensed","Arial Narrow",sans-serif; }
+    body.paa .two.wide-side{ grid-template-columns:minmax(0,1fr) var(--paa-dock-w); }
+    body.paa .two.wide-side > #paa-dock{ grid-area:auto; }
+    body.paa #mods{ display:none; }
+    body.paa #step{ border:0; padding:0; background:transparent; box-shadow:none; position:static; }
+    body.paa #step .kicker, body.paa #step .prog{ display:none; }
+    body.paa #step h2{ font-family:var(--serif); font-size:19px; line-height:26px; margin:0 0 10px; }
+    body.paa #step .stem{ font-family:var(--serif); font-weight:400; font-size:18px; line-height:26px; }
+    body.paa #step .opt{ width:100%; font-size:15px; line-height:21px; }
+    body.paa #step .opt .ltr{ font-family:var(--cond); font-weight:600; color:var(--ink2); }
+    body.paa #step .opt.right{ border:2px solid var(--good); background:var(--panel); }
+    body.paa #step .opt.wrong{ border:2px solid var(--muted); background:var(--panel); }
+    body.paa #step .opt.wrong .ltr, body.paa #step .opt.right .ltr{ color:var(--muted); }
+    body.paa #step .fb{ border-left:3px solid var(--muted); background:transparent; border-radius:0; }
+    body.paa #step .fb:not(.no){ border-left-color:var(--good); }
+    body.paa #step .opt .tag{ display:block; font-size:13px; font-weight:700; margin-top:2px; }
+    body.paa #step .opt.right .tag{ color:var(--good); }
+    body.paa #step .fb{ font-size:15px; }
+    body.paa #step .fb:focus{ outline:none; }
+    body.paa .paa-foot .nav{ display:contents; }
+    body.paa .paa-foot .nav .sp{ flex:1; }
+    body.paa .paa-foot .btn{ border:1px solid var(--line); background:var(--panel); color:var(--ink); border-radius:8px; padding:7px 14px; font-size:15px; font-weight:500; }
+    body.paa .paa-foot #next{ background:var(--ink); color:var(--bg); border-color:var(--ink); font-weight:700; }
+    body.paa .paa-foot #next:disabled{ opacity:.45; cursor:not-allowed; }
+    @media (max-width:1099px){ body.paa .two.wide-side{ grid-template-columns:minmax(0,1fr); } }`;
+  document.head.appendChild(css);
+
+  const stepEl = document.getElementById('step');
+  const grid = stepEl.parentElement; // the lab's two-column grid: monitor, step card
+  const ui = D.shell({ grid, lab: 'wl' });
+  document.querySelector('header.top') && document.querySelector('header.top').classList.add('paa-dark');
+  const monHost = document.getElementById('monHost'); if (monHost) monHost.classList.add('paa-dark');
+  ui.body.appendChild(stepEl);
+
+  const prog = () => D.store.get('wl.learn', {});
+  const pos = () => D.store.get('wl.learn.pos', { m: 0, s: 0 });
+  const kindOf = (st) => st.q ? 'Explanation and knowledge check' : st.act ? 'Try it on the monitor' : 'Explanation';
+  const jump = (i, j) => { location.hash = `#m${i + 1}-s${j + 1}`; }; // handled below: saves the position, then reloads
+  const answered = (m, j) => { const p = (prog()[m.id] || {})[j]; return !!(p && p.c != null); };
+  function states(i) {
+    const m = MODS[i], p = prog()[m.id] || {}, cur = pos();
+    return m.steps.map((s, j) => {
+      const done = p[j] && p[j].v && (!s.q || p[j].c != null);
+      const isCur = !ahead && !finished && cur.m === i && cur.s === j;
+      return isCur ? (done ? 'cur-done' : 'cur') : done ? 'done' : 'todo';
+    });
+  }
+  function summary(i) {
+    const m = MODS[i], p = prog()[m.id] || {}, st = states(i);
+    const done = st.filter((s) => s === 'done' || s === 'cur-done').length;
+    const qs = m.steps.map((s, j) => [s, j]).filter(([s]) => s.q);
+    const right = qs.filter(([s, j]) => p[j] && p[j].c === s.q.a).length;
+    if (done === m.steps.length) return qs.length ? `Done, ${right} of ${qs.length} correct` : 'Done';
+    if (done) return `${done} of ${m.steps.length} steps`;
+    return '';
+  }
+
+  let ahead = null, finished = false;
+  function renderMap() {
+    const cur = pos();
+    ui.mapList.innerHTML = MODS.map((m, i) => `<li><button type="button" class="paa-row" data-l="${i}" ${(!ahead && cur.m === i) || ahead === i ? 'aria-current="true"' : ''}><span class="n">${i + 1}</span><span class="t">${esc(m.title)}</span><span class="sum">${esc(summary(i))}</span>${D.cells(states(i))}</button></li>`).join('');
+    ui.mapList.querySelectorAll('[data-l]').forEach((b) => b.addEventListener('click', () => {
+      const i = +b.dataset.l;
+      if (!finished && pos().m === i) { closeAhead(); return; }
+      ahead = i; renderAhead();
+    }));
+    ui.mapSum.innerHTML = `All modules <span style="margin-left:6px">${D.cells(states(ahead != null ? ahead : cur.m), 'Module ' + ((ahead != null ? ahead : cur.m) + 1))}</span>`;
+  }
+
+  /* read ahead: the lab's step card stays where it is, hidden, so nothing is lost */
+  let aheadBox = null;
+  function renderAhead() {
+    const m = MODS[ahead], i = ahead, cur = pos();
+    stepEl.hidden = true;
+    if (!aheadBox) { aheadBox = document.createElement('div'); ui.body.prepend(aheadBox); }
+    aheadBox.hidden = false;
+    ui.pos.textContent = `Module ${i + 1} of ${MODS.length}`; ui.title.textContent = m.title;
+    aheadBox.innerHTML = `${finished ? '' : `<p class="paa-ahead-note" role="status"><span>Reading ahead</span><button type="button" class="paa-btn" id="paaBack">Back to step ${cur.s + 1} of Module ${cur.m + 1}</button></p>`}
+      <p class="paa-kind">${m.steps.length} steps</p><ol class="paa-steplist">${m.steps.map((s, j) => `<li><span class="n">${j + 1}</span><button type="button" class="paa-steplink" data-go="${j}"><span class="k">${kindOf(s)}</span>${s.t}${s.q ? `<span class="k" style="margin-top:2px">${s.q.s}</span>` : ''}</button></li>`).join('')}</ol>`;
+    aheadBox.querySelectorAll('[data-go]').forEach((b) => b.onclick = () => jump(i, +b.dataset.go));
+    footSaved = footSaved || [...ui.foot.childNodes];
+    ui.foot.innerHTML = `<span class="spacer"></span><button type="button" class="paa-btn primary" id="paaStart">${finished ? 'Start module' : 'Go to this module'}</button>`;
+    document.getElementById('paaStart').onclick = () => { const b = document.querySelector(`#mods [data-m="${i}"]`); ahead = null; finished = false; closeAhead(true); if (b) b.click(); };
+    const bk = document.getElementById('paaBack'); if (bk) bk.onclick = () => closeAhead();
+    renderMap(); ui.body.scrollTop = 0;
+  }
+  let footSaved = null;
+  function closeAhead(silent) {
+    ahead = null;
+    if (aheadBox) aheadBox.hidden = true;
+    stepEl.hidden = false;
+    if (footSaved) { ui.foot.innerHTML = ''; footSaved.forEach((n) => ui.foot.appendChild(n)); footSaved = null; }
+    if (!silent) dress();
+  }
+
+  /* re-dress the lab's step after each redraw */
+  let lastKey = '';
+  function dress() {
+    obs.disconnect();
+    try {
+      const cur = pos(), m = MODS[cur.m], st = m && m.steps[cur.s];
+      const kicker = stepEl.querySelector('.kicker');
+      finished = !!(kicker && /All modules/.test(kicker.textContent));
+      if (finished) { dressFinished(); return; }
+      if (!st) return;
+      ui.pos.textContent = `Module ${cur.m + 1} of ${MODS.length}`; ui.title.textContent = m.title;
+      let kind = stepEl.querySelector('.paa-kind');
+      if (!kind) { kind = document.createElement('p'); kind.className = 'paa-kind'; kind.tabIndex = -1; stepEl.prepend(kind); }
+      kind.textContent = `${kindOf(st)}, step ${cur.s + 1} of ${m.steps.length}`;
+      // the nav moves into the dock footer; the lab's own click handlers come along
+      const nav = stepEl.querySelector('.nav');
+      ui.foot.innerHTML = '';
+      const needAnswer = st.q && !answered(m, cur.s);
+      if (needAnswer) { const why = document.createElement('p'); why.className = 'why'; why.textContent = 'Answer to see the explanation and go on.'; ui.foot.appendChild(why); }
+      if (nav) {
+        ui.foot.appendChild(nav);
+        const prev = nav.querySelector('#prev'), next = nav.querySelector('#next');
+        if (prev) prev.textContent = 'Previous step';
+        if (next) {
+          const lastStep = cur.s === m.steps.length - 1;
+          next.textContent = lastStep ? 'Finish module' : 'Next step'; next.disabled = !!needAnswer;
+          if (lastStep && cur.m < MODS.length - 1) next.addEventListener('click', (e) => { if (next.dataset.pass) return; e.stopImmediatePropagation(); showModuleDone(cur.m, next); }, { capture: true });
+        }
+      }
+      const pc = ((prog()[m.id] || {})[cur.s] || {}).c;
+      stepEl.querySelectorAll('.opt').forEach((b) => { if (pc != null && +b.dataset.oi === pc) b.dataset.chosen = '1'; });
+      tagOptions(st);
+      stepEl.querySelectorAll('.opt').forEach((b) => b.addEventListener('click', () => setTimeout(afterAnswer, 0), { once: true }));
+      renderMap();
+      const key = `${cur.m}:${cur.s}`;
+      if (key !== lastKey) {
+        if (lastKey && lastKey.split(':')[0] !== String(cur.m)) ui.map.open = false;
+        if (!lastKey && window.PAA_FIRST_VISIT) ui.map.open = true;
+        lastKey = key; ui.body.scrollTop = 0; kind.focus({ preventScroll: true });
+      }
+      history.replaceState(null, '', `#m${cur.m + 1}-s${cur.s + 1}`);
+      const what = st.q && !answered(m, cur.s) ? 'Knowledge check: answer to go on' : kindOf(st);
+      ui.barPos.textContent = `Module ${cur.m + 1}: ${m.title}`;
+      ui.barWhat.textContent = `Step ${cur.s + 1} of ${m.steps.length}. ${what}`;
+    } finally { obs.observe(stepEl, { childList: true }); }
+  }
+  function tagOptions(st) {
+    if (!st.q) return;
+    stepEl.querySelectorAll('.opt').forEach((b) => {
+      if (b.querySelector('.tag')) return;
+      const right = b.classList.contains('right'), wrong = b.classList.contains('wrong');
+      if (!right && !wrong) return;
+      const t = document.createElement('span'); t.className = 'tag';
+      t.textContent = right ? (b.dataset.chosen ? 'Your answer, correct' : 'Correct answer') : 'Your answer';
+      b.lastElementChild.appendChild(t);
+    });
+  }
+  function afterAnswer() {
+    const cur = pos(), m = MODS[cur.m], st = m.steps[cur.s];
+    const p = (prog()[m.id] || {})[cur.s];
+    stepEl.querySelectorAll('.opt').forEach((b) => { if (p && +b.dataset.oi === p.c) b.dataset.chosen = '1'; });
+    tagOptions(st);
+    const why = ui.foot.querySelector('.why'); if (why) why.remove();
+    const next = ui.foot.querySelector('#next'); if (next) next.disabled = false;
+    const fb = stepEl.querySelector('.fb'); if (fb) { fb.tabIndex = -1; fb.scrollIntoView({ block: 'nearest' }); fb.focus({ preventScroll: true }); }
+    renderMap();
+    ui.barWhat.textContent = `Step ${cur.s + 1} of ${m.steps.length}. Knowledge check`;
+  }
+  function showModuleDone(i, labNext) {
+    obs.disconnect();
+    const m = MODS[i], st = states(i).map((x) => x.replace('cur-', '').replace('cur', 'todo'));
+    const p = prog()[m.id] || {};
+    const done = st.filter((x) => x === 'done').length;
+    const qs = m.steps.map((s, j) => [s, j]).filter(([s]) => s.q);
+    const right = qs.filter(([s, j]) => p[j] && p[j].c === s.q.a).length;
+    stepEl.hidden = true;
+    if (!aheadBox) { aheadBox = document.createElement('div'); ui.body.prepend(aheadBox); }
+    aheadBox.hidden = false;
+    aheadBox.innerHTML = `<p class="paa-kind" role="status" tabindex="-1">${done === m.steps.length ? 'Module done' : 'End of module'}</p>
+      <dl class="paa-facts"><dt>${done} of ${m.steps.length}</dt><dd>steps done</dd><dt>${right} of ${qs.length}</dt><dd>knowledge checks correct</dd></dl>`;
+    footSaved = [...ui.foot.childNodes];
+    ui.foot.innerHTML = `<button type="button" class="paa-btn" id="paaRep">Repeat module</button><span class="spacer"></span><button type="button" class="paa-btn primary" id="paaNextMod">Module ${i + 2}</button>`;
+    document.getElementById('paaRep').onclick = () => jump(i, 0);
+    document.getElementById('paaNextMod').onclick = () => { closeAhead(true); labNext.dataset.pass = '1'; labNext.click(); };
+    aheadBox.querySelector('.paa-kind').focus({ preventScroll: true });
+    renderMap();
+    obs.observe(stepEl, { childList: true });
+  }
+  function dressFinished() {
+    // the lab says "You've worked through the Learn modules" even after one module; say what is true
+    const all = MODS.map((m, i) => states(i).every((s) => s === 'done'));
+    const doneCount = all.filter(Boolean).length;
+    let right = 0, total = 0;
+    MODS.forEach((m) => m.steps.forEach((s, j) => { if (s.q) { total++; const p = (prog()[m.id] || {})[j]; if (p && p.c === s.q.a) right++; } }));
+    const h2 = stepEl.querySelector('h2');
+    if (h2) h2.textContent = doneCount === MODS.length ? 'All modules done' : `${doneCount} of ${MODS.length} modules done`;
+    ui.pos.textContent = 'Learn'; ui.title.textContent = 'Where you are';
+    ui.foot.innerHTML = '';
+    renderMap(); ui.map.open = true;
+    ui.barPos.textContent = 'Learn'; ui.barWhat.textContent = `${doneCount} of ${MODS.length} modules done, ${right} of ${total} correct`;
+    history.replaceState(null, '', location.pathname);
+  }
+
+  const obs = new MutationObserver(() => { if (ahead == null) dress(); });
+  dress();
+  // an address typed in this tab (#m5-s4): save it as the lab's position and reload, as on first open
+  window.addEventListener('hashchange', () => {
+    const mm = /^#m(\d+)(?:-s(\d+))?$/.exec(location.hash); if (!mm) return;
+    const want = { m: +mm[1] - 1, s: mm[2] ? +mm[2] - 1 : 0 }, cur = pos();
+    if (want.m === cur.m && want.s === cur.s) return;
+    D.store.set('wl.learn.pos', want); location.reload();
+  });
+})();
+}
+</script>
+<!-- /paa-lesson-dock -->
 </body>
 </html>
